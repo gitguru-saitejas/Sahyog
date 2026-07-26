@@ -1,16 +1,3 @@
-# Python
-__pycache__/
-**/__pycache__/
-*.pyc
-*.pyo
-
-# Python virtual environments
-.venv/
-venv/
-
-# Local databases
-*.db
-
 # Environment
 .env
 .env.*
@@ -21,6 +8,19 @@ venv/
 node_modules/
 **/node_modules/
 
-# Frontend build
+# Frontend builds
 dist/
 **/dist/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Python environments
+.venv/
+venv/
+
+# Local databases
+*.db
