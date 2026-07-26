@@ -1,14 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 from app.core.config import settings
 from app.database.session import engine, Base
-from app.api.endpoints import auth, patients
+from app.api.endpoints import auth, patients, super_admin
 
 # Import models so Base recognizes them before table creation
-from app.models import family_account, patient
+from app.models import family_account, patient, user, hospital, rag, audit
+
+# Ensure static directory exists
+os.makedirs("static/uploads", exist_ok=True)
 
 # Automatically create missing database tables on startup
-Base.metadata.create_all(bind=engine)
+import sys
+if "pytest" not in sys.modules:
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -33,8 +40,10 @@ app.add_middleware(
 )
 
 # Include endpoint routers under versioned paths
+app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(patients.router, prefix=f"{settings.API_V1_STR}/patients", tags=["patients"])
+app.include_router(super_admin.router, prefix="/api/v1/super-admin", tags=["super-admin"])
 
 @app.get("/")
 def read_root():

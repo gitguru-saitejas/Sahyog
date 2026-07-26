@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     # Loaded from backend/.env — falls back to local SQLite if not set
     DATABASE_URL: str = "sqlite:///./sahyog.db"
 
+    # Supabase Storage Configurations for RAG Guideline Documents
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_STORAGE_BUCKET: str = "rag-documents"
+
     # CORS Allowed origins
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
