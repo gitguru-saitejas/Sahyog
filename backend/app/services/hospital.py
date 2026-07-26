@@ -3,6 +3,9 @@ from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, status
 from typing import List, Optional
 import json
+import random
+import string
+
 
 from app.repositories.hospital import HospitalRepository
 from app.models.patient import (
@@ -10,6 +13,23 @@ from app.models.patient import (
     Department, Encounter, Prescription, PrescriptionMedicine, HospitalAuditLog, Patient
 )
 from app.core import security
+
+# ---------------------------------------------------------------------------
+# Utility: Guaranteed Secure Temporary Password Generator
+# Guarantees at least 1 uppercase, 1 lowercase, 1 digit, 1 special character.
+# Total length: 12 characters.
+# ---------------------------------------------------------------------------
+def generate_secure_temp_password() -> str:
+    upper = random.choice(string.ascii_uppercase)
+    lower = random.choice(string.ascii_lowercase)
+    digit = random.choice(string.digits)
+    special = random.choice("!@#$%^&*")
+    all_chars = string.ascii_uppercase + string.ascii_lowercase + string.digits + "!@#$%^&*"
+    remaining = [random.choice(all_chars) for _ in range(8)]
+    pwd_list = list(upper + lower + digit + special) + remaining
+    random.shuffle(pwd_list)
+    return "".join(pwd_list)
+
 
 class HospitalService:
     def __init__(self, db: Session):
@@ -100,23 +120,42 @@ class HospitalService:
             "employee_id": user.employee_id,
             "role": user.role,
             "first_name": user.first_name,
-            "last_name": user.last_name
+            "last_name": user.last_name,
+            "is_first_login": user.is_first_login,
+            "password_changed": user.password_changed,
         }
 
     # ---------------------------------------------------------
     # HOSPITAL ADMIN
     # ---------------------------------------------------------
     def create_doctor(self, hospital_id: str, doc_data: dict, admin_id: str, ip_address: Optional[str] = None) -> HospitalUser:
-        # Check unique employee_id
-        if self.repo.get_employee_by_id(doc_data["employee_id"]):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Employee ID already exists.")
+        from app.models.hospital import Hospital
+        import random
+
+        # Determine hospital prefix
+        hospitals = self.db.query(Hospital).order_by(Hospital.created_at).all()
+        h_index = next((i for i, h in enumerate(hospitals) if h.id == hospital_id), 0) + 1
+        hosp_prefix = f"HOS{h_index:03d}"
+
+        # Generate unique employee ID
+        doctor_count = self.db.query(HospitalUser).filter(
+            HospitalUser.hospital_id == hospital_id,
+            HospitalUser.role == "DOCTOR"
+        ).count() + 1
+        employee_id = f"{hosp_prefix}DOC{doctor_count:03d}"
+        while self.repo.get_employee_by_id(employee_id):
+            doctor_count += 1
+            employee_id = f"{hosp_prefix}DOC{doctor_count:03d}"
+
+        # Generate secure temporary password (guaranteed complexity)
+        temp_password = generate_secure_temp_password()
+        password_hash = security.get_password_hash(temp_password)
 
         # Atomic creation
         try:
-            password_hash = security.get_password_hash(doc_data["password"])
             user = HospitalUser(
                 hospital_id=hospital_id,
-                employee_id=doc_data["employee_id"],
+                employee_id=employee_id,
                 password_hash=password_hash,
                 role="DOCTOR",
                 first_name=doc_data["first_name"],
@@ -124,7 +163,9 @@ class HospitalService:
                 email=doc_data.get("email"),
                 phone=doc_data.get("phone"),
                 department_id=doc_data.get("department_id"),
-                status="ACTIVE"
+                status="ACTIVE",
+                is_first_login=True,
+                password_changed=False,
             )
             self.db.add(user)
             self.db.flush()
@@ -140,6 +181,9 @@ class HospitalService:
             self.db.add(profile)
             self.db.commit()
             self.db.refresh(user)
+
+            # Set temporary password so it can be returned to caller
+            setattr(user, "temporary_password", temp_password)
 
             self.repo.create_audit_log(
                 hospital_id=hospital_id,
@@ -200,14 +244,32 @@ class HospitalService:
         )
 
     def create_support_staff(self, hospital_id: str, staff_data: dict, admin_id: str, ip_address: Optional[str] = None) -> HospitalUser:
-        if self.repo.get_employee_by_id(staff_data["employee_id"]):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Employee ID already exists.")
+        from app.models.hospital import Hospital
+        import random
+
+        # Determine hospital prefix
+        hospitals = self.db.query(Hospital).order_by(Hospital.created_at).all()
+        h_index = next((i for i, h in enumerate(hospitals) if h.id == hospital_id), 0) + 1
+        hosp_prefix = f"HOS{h_index:03d}"
+
+        # Generate unique employee ID
+        staff_count = self.db.query(HospitalUser).filter(
+            HospitalUser.hospital_id == hospital_id,
+            HospitalUser.role == "SUPPORT_STAFF"
+        ).count() + 1
+        employee_id = f"{hosp_prefix}STF{staff_count:03d}"
+        while self.repo.get_employee_by_id(employee_id):
+            staff_count += 1
+            employee_id = f"{hosp_prefix}STF{staff_count:03d}"
+
+        # Generate secure temporary password (guaranteed complexity)
+        temp_password = generate_secure_temp_password()
+        password_hash = security.get_password_hash(temp_password)
 
         try:
-            password_hash = security.get_password_hash(staff_data["password"])
             user = HospitalUser(
                 hospital_id=hospital_id,
-                employee_id=staff_data["employee_id"],
+                employee_id=employee_id,
                 password_hash=password_hash,
                 role="SUPPORT_STAFF",
                 first_name=staff_data["first_name"],
@@ -215,7 +277,9 @@ class HospitalService:
                 email=staff_data.get("email"),
                 phone=staff_data.get("phone"),
                 department_id=staff_data.get("department_id"),
-                status="ACTIVE"
+                status="ACTIVE",
+                is_first_login=True,
+                password_changed=False,
             )
             self.db.add(user)
             self.db.flush()
@@ -228,6 +292,9 @@ class HospitalService:
             self.db.add(profile)
             self.db.commit()
             self.db.refresh(user)
+
+            # Set temporary password so it can be returned to caller
+            setattr(user, "temporary_password", temp_password)
 
             self.repo.create_audit_log(
                 hospital_id=hospital_id,
@@ -269,11 +336,14 @@ class HospitalService:
         return user
 
     def reset_employee_password(self, hospital_id: str, target_employee_id: str, new_password: str, admin_id: str, ip_address: Optional[str] = None):
+        """Admin-supplied password reset. Also accepts auto-generated passwords via reset_employee_password_auto."""
         user = self.repo.get_employee_by_id(target_employee_id)
         if not user or str(user.hospital_id) != hospital_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found in your hospital.")
 
         user.password_hash = security.get_password_hash(new_password)
+        user.is_first_login = True
+        user.password_changed = False
         self.db.commit()
 
         self.repo.create_audit_log(
@@ -284,6 +354,55 @@ class HospitalService:
             resource_id=user.id,
             ip_address=ip_address,
             details=json.dumps({"target_employee_id": target_employee_id})
+        )
+
+    def reset_employee_password_auto(self, hospital_id: str, target_employee_id: str, admin_id: str, ip_address: Optional[str] = None) -> str:
+        """Generate and apply a new secure temporary password. Returns the plain-text password for display."""
+        user = self.repo.get_employee_by_id(target_employee_id)
+        if not user or str(user.hospital_id) != hospital_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found in your hospital.")
+
+        new_temp_password = generate_secure_temp_password()
+        user.password_hash = security.get_password_hash(new_temp_password)
+        user.is_first_login = True
+        user.password_changed = False
+        self.db.commit()
+
+        self.repo.create_audit_log(
+            hospital_id=hospital_id,
+            user_id=admin_id,
+            action="RESET_PASSWORD_AUTO",
+            resource="hospital_users",
+            resource_id=user.id,
+            ip_address=ip_address,
+            details=json.dumps({"target_employee_id": target_employee_id, "reset_by": admin_id})
+        )
+        return new_temp_password
+
+    def change_own_password(self, user_id: str, current_password: str, new_password: str, ip_address: Optional[str] = None):
+        """Employee changes their own password (typically forced on first login)."""
+        user = self.db.query(HospitalUser).filter(
+            HospitalUser.id == user_id, HospitalUser.deleted_at == None
+        ).first()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee account not found.")
+
+        if not security.verify_password(current_password, user.password_hash):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect.")
+
+        user.password_hash = security.get_password_hash(new_password)
+        user.is_first_login = False
+        user.password_changed = True
+        self.db.commit()
+
+        self.repo.create_audit_log(
+            hospital_id=user.hospital_id,
+            user_id=user.id,
+            action="PASSWORD_CHANGED",
+            resource="hospital_users",
+            resource_id=user.id,
+            ip_address=ip_address,
+            details=json.dumps({"first_login_completed": True})
         )
 
     def get_dashboard_summary(self, hospital_id: str) -> dict:

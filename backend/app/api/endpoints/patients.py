@@ -119,8 +119,8 @@ from app.api.endpoints.auth import (
 from app.models.patient import HospitalUser, Department, Encounter, Prescription
 from app.schemas.patient import (
     DepartmentCreate, DepartmentResponse,
-    DoctorCreate, DoctorUpdate, DoctorResponse,
-    SupportStaffCreate, SupportStaffUpdate, SupportStaffResponse,
+    DoctorCreate, DoctorUpdate, DoctorResponse, DoctorCreateResponse,
+    SupportStaffCreate, SupportStaffUpdate, SupportStaffResponse, SupportStaffCreateResponse,
     EncounterCreate, EncounterUpdate, EncounterResponse,
     PrescriptionCreate, PrescriptionResponse
 )
@@ -129,7 +129,7 @@ from app.services.hospital import HospitalService
 # ---------------------------
 # HOSPITAL ADMIN APIS
 # ---------------------------
-@router.post("/hospital/admin/doctors", response_model=DoctorResponse, tags=["hospital-admin"])
+@router.post("/hospital/admin/doctors", response_model=DoctorCreateResponse, tags=["hospital-admin"])
 def create_doctor(
     req: DoctorCreate,
     request: Request,
@@ -185,7 +185,7 @@ def delete_doctor(
     service.delete_employee(str(current_admin.hospital_id), user_id, str(current_admin.id), ip_address)
     return {"success": True, "message": "Doctor profile soft-deleted successfully."}
 
-@router.post("/hospital/admin/staff", response_model=SupportStaffResponse, tags=["hospital-admin"])
+@router.post("/hospital/admin/staff", response_model=SupportStaffCreateResponse, tags=["hospital-admin"])
 def create_staff(
     req: SupportStaffCreate,
     request: Request,
@@ -247,8 +247,20 @@ def create_department(
     current_admin: HospitalUser = Depends(require_hospital_admin),
     db: Session = Depends(get_db)
 ):
+    # Guard: check for existing active department with the same name (case-insensitive)
+    from sqlalchemy import func
     service = HospitalService(db)
-    return service.repo.create_department(str(current_admin.hospital_id), req.name, req.description)
+    existing = db.query(Department).filter(
+        Department.hospital_id == str(current_admin.hospital_id),
+        func.lower(Department.name) == req.name.strip().lower(),
+        Department.deleted_at == None
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A department named '{req.name}' already exists in this hospital."
+        )
+    return service.repo.create_department(str(current_admin.hospital_id), req.name.strip(), req.description)
 
 @router.get("/hospital/admin/departments", response_model=List[DepartmentResponse], tags=["hospital-admin"])
 def list_departments(
@@ -307,6 +319,16 @@ def create_or_update_encounter(
     encounter = service.create_or_update_encounter(str(current_staff.hospital_id), str(current_staff.id), data, ip_address)
     return encounter
 
+@router.get("/hospital/staff/doctors", response_model=List[DoctorResponse], tags=["hospital-staff"])
+def staff_list_doctors(
+    current_staff: HospitalUser = Depends(require_support_staff),
+    db: Session = Depends(get_db)
+):
+    """Allows support staff to list active doctors in their hospital for triage assignment."""
+    service = HospitalService(db)
+    return service.repo.get_employees_by_role(str(current_staff.hospital_id), "DOCTOR")
+
+
 # ---------------------------
 # HOSPITAL DOCTOR APIS
 # ---------------------------
@@ -349,3 +371,15 @@ def complete_consultation(
     service = HospitalService(db)
     return service.complete_consultation(str(current_doctor.hospital_id), encounter_id, str(current_doctor.id), req.model_dump(), ip_address)
 
+@router.get("/hospital/doctor/encounters/{encounter_id}", response_model=EncounterResponse, tags=["hospital-doctor"])
+def get_encounter_detail(
+    encounter_id: str,
+    current_doctor: HospitalUser = Depends(require_doctor),
+    db: Session = Depends(get_db)
+):
+    """Returns the full encounter record (all vitals + clinical notes entered by support staff)."""
+    service = HospitalService(db)
+    enc = service.repo.get_encounter(str(current_doctor.hospital_id), encounter_id)
+    if not enc:
+        raise HTTPException(status_code=404, detail="Encounter not found.")
+    return enc

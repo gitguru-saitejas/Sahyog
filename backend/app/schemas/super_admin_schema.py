@@ -72,6 +72,10 @@ class HospitalDetailResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class HospitalCreateResponse(HospitalDetailResponse):
+    admin_employee_id: Optional[str] = None
+    admin_temp_password: Optional[str] = None
+
 class HospitalListResponse(BaseModel):
     items: List[HospitalDetailResponse]
     page: int

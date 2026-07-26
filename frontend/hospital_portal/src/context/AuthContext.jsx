@@ -1,25 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import api from "../services/api";
 
-interface ToastMessage {
-  type: "success" | "error" | "info" | "warning";
-  message: string;
-}
-
-interface AuthContextType {
-  employee: any;
-  employeeToken: string | null;
-  globalLoading: boolean;
-  toastMessage: ToastMessage | null;
-  theme: string;
-  loginAsEmployee: (employeeId: string, password: string) => Promise<any>;
-  employeeLogout: () => void;
-  toggleTheme: () => void;
-  showToast: (type: "success" | "error" | "info" | "warning", message: string) => void;
-  clearToast: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -27,14 +9,14 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [employee, setEmployee] = useState<any>(() => {
+export const AuthProvider = ({ children }) => {
+  const [employee, setEmployee] = useState(() => {
     const val = localStorage.getItem("employee");
     return val ? JSON.parse(val) : null;
   });
-  const [employeeToken, setEmployeeToken] = useState<string | null>(() => localStorage.getItem("employeeToken"));
+  const [employeeToken, setEmployeeToken] = useState(() => localStorage.getItem("employeeToken"));
   const [globalLoading, setGlobalLoading] = useState(false);
-  const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null);
+  const [toastMessage, setToastMessage] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
 
   useEffect(() => {
@@ -48,14 +30,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const toggleTheme = () => setTheme(prev => (prev === "light" ? "dark" : "light"));
 
-  const showToast = (type: "success" | "error" | "info" | "warning", message: string) => {
+  const showToast = (type, message) => {
     setToastMessage({ type, message });
     setTimeout(() => setToastMessage(null), 4000);
   };
 
   const clearToast = () => setToastMessage(null);
 
-  const loginAsEmployee = async (employeeId: string, password: string) => {
+  const loginAsEmployee = async (employeeId, password) => {
     setGlobalLoading(true);
     try {
       const res = await api.post("/auth/employee/login", {
@@ -69,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setEmployee(data);
       showToast("success", `Welcome back, ${data.first_name}!`);
       return data;
-    } catch (err: any) {
+    } catch (err) {
       const errorMsg = err.response?.data?.detail || "Authentication failed.";
       showToast("error", errorMsg);
       throw err;

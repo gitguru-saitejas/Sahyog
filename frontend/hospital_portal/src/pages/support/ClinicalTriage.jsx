@@ -7,9 +7,9 @@ import { Search, User, ClipboardList } from "lucide-react";
 export default function ClinicalTriage() {
   const { showToast } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [patients, setPatients] = useState<any[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<any>(null);
-  const [doctors, setDoctors] = useState<any[]>([]);
+  const [patients, setPatients] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const { register, handleSubmit, setValue, watch, reset } = useForm({
@@ -53,10 +53,11 @@ export default function ClinicalTriage() {
 
   const loadDoctors = async () => {
     try {
-      const docRes = await api.get("/patients/hospital/admin/doctors");
+      // Use the staff-accessible endpoint (not the admin-only one)
+      const docRes = await api.get("/patients/hospital/staff/doctors");
       setDoctors(docRes.data);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load doctors:", err);
     }
   };
 
@@ -64,7 +65,7 @@ export default function ClinicalTriage() {
     loadDoctors();
   }, []);
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setLoading(true);
@@ -81,7 +82,7 @@ export default function ClinicalTriage() {
     }
   };
 
-  const onEncounterSubmit = async (data: any) => {
+  const onEncounterSubmit = async (data) => {
     if (!selectedPatient) return;
     try {
       const payload = {

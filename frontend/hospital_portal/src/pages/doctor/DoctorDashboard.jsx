@@ -10,8 +10,8 @@ import {
 export default function DoctorDashboard() {
   const { showToast } = useAuth();
   const [stats, setStats] = useState({ total_today: 0, pending_count: 0, completed_count: 0 });
-  const [encounters, setEncounters] = useState<any[]>([]);
-  const [selectedEncounter, setSelectedEncounter] = useState<any>(null);
+  const [encounters, setEncounters] = useState([]);
+  const [selectedEncounter, setSelectedEncounter] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const { register, control, handleSubmit, reset } = useForm({
@@ -50,7 +50,7 @@ export default function DoctorDashboard() {
     fetchDoctorDashboard();
   }, []);
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data) => {
     if (!selectedEncounter) return;
     try {
       const payload = {
@@ -58,7 +58,7 @@ export default function DoctorDashboard() {
         patient_id: selectedEncounter.patient_id,
         diagnosis: data.diagnosis,
         notes: data.notes,
-        medicines: data.medicines.filter((m: any) => m.medicine_name.trim() !== "")
+        medicines: data.medicines.filter((m) => m.medicine_name.trim() !== "")
       };
 
       await api.post(`/patients/hospital/doctor/encounters/${selectedEncounter.id}/complete`, payload);
@@ -185,35 +185,79 @@ export default function DoctorDashboard() {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               
               <section className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-850 p-6 rounded-3xl shadow-sm space-y-4">
-                <h3 className="font-bold text-xs text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-2">
-                  Pre-Consultation Vital Signs
+                <h3 className="font-bold text-xs text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+                  Pre-Consultation Data (Entered by Support Staff)
                 </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                  <div>
-                    <span className="block text-slate-400 font-semibold mb-0.5">BP</span>
-                    <strong className="font-bold text-slate-805 dark:text-slate-150">{selectedEncounter.blood_pressure || "N/A"}</strong>
-                  </div>
-                  <div>
-                    <span className="block text-slate-400 font-semibold mb-0.5">Pulse Rate</span>
-                    <strong className="font-bold text-slate-805 dark:text-slate-150">{selectedEncounter.pulse_rate ? `${selectedEncounter.pulse_rate} bpm` : "N/A"}</strong>
-                  </div>
-                  <div>
-                    <span className="block text-slate-400 font-semibold mb-0.5">Temp</span>
-                    <strong className="font-bold text-slate-805 dark:text-slate-150">{selectedEncounter.temperature ? `${selectedEncounter.temperature} °C` : "N/A"}</strong>
-                  </div>
-                  <div>
-                    <span className="block text-slate-400 font-semibold mb-0.5">SpO₂</span>
-                    <strong className="font-bold text-emerald-500">{selectedEncounter.spo2 ? `${selectedEncounter.spo2}%` : "N/A"}</strong>
-                  </div>
+
+                {/* Vitals Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  {[
+                    { label: "Blood Pressure", value: selectedEncounter.blood_pressure, unit: "" },
+                    { label: "Pulse Rate", value: selectedEncounter.pulse_rate, unit: "bpm" },
+                    { label: "Temperature", value: selectedEncounter.temperature, unit: "°C" },
+                    { label: "SpO₂", value: selectedEncounter.spo2, unit: "%" },
+                    { label: "Height", value: selectedEncounter.height, unit: "cm" },
+                    { label: "Weight", value: selectedEncounter.weight, unit: "kg" },
+                    { label: "BMI", value: selectedEncounter.bmi, unit: "" },
+                    { label: "Resp Rate", value: selectedEncounter.respiratory_rate, unit: "rpm" },
+                  ].map(({ label, value, unit }) => (
+                    <div key={label} className="bg-slate-50 dark:bg-slate-955 p-2.5 rounded-xl">
+                      <span className="block text-slate-400 font-semibold text-3xs mb-0.5">{label}</span>
+                      <strong className="font-bold text-slate-800 dark:text-slate-100">
+                        {value != null && value !== "" ? `${value}${unit ? " " + unit : ""}` : "—"}
+                      </strong>
+                    </div>
+                  ))}
                 </div>
 
-                {selectedEncounter.chief_complaint && (
-                  <div className="text-xs p-3.5 bg-slate-50 dark:bg-slate-955 rounded-xl leading-relaxed">
-                    <span className="font-bold text-slate-400 block mb-0.5">Chief Complaint:</span>
-                    <p className="font-medium text-slate-700 dark:text-slate-350">{selectedEncounter.chief_complaint}</p>
+                {/* Complaints & Symptoms */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {selectedEncounter.chief_complaint && (
+                    <div className="p-3.5 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-xl">
+                      <span className="font-bold text-amber-600 dark:text-amber-400 block mb-1 text-3xs uppercase tracking-wider">Chief Complaint</span>
+                      <p className="font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{selectedEncounter.chief_complaint}</p>
+                    </div>
+                  )}
+                  {selectedEncounter.symptoms && (
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-955 border border-slate-100 dark:border-slate-800 rounded-xl">
+                      <span className="font-bold text-slate-500 dark:text-slate-400 block mb-1 text-3xs uppercase tracking-wider">Symptoms</span>
+                      <p className="font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{selectedEncounter.symptoms}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lab Results */}
+                {(selectedEncounter.blood_group || selectedEncounter.blood_sugar || selectedEncounter.cbc || selectedEncounter.urine_test || selectedEncounter.ecg || selectedEncounter.other_labs) && (
+                  <div className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
+                    <div className="bg-slate-50 dark:bg-slate-955 px-3 py-2 text-3xs font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">Lab Results</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-slate-100 dark:bg-slate-800">
+                      {[
+                        { label: "Blood Group", value: selectedEncounter.blood_group },
+                        { label: "Blood Sugar", value: selectedEncounter.blood_sugar },
+                        { label: "CBC", value: selectedEncounter.cbc },
+                        { label: "Urine Test", value: selectedEncounter.urine_test },
+                        { label: "ECG", value: selectedEncounter.ecg },
+                        { label: "Other Labs", value: selectedEncounter.other_labs },
+                      ].filter(r => r.value).map(({ label, value }) => (
+                        <div key={label} className="bg-white dark:bg-slate-900 p-2.5 text-xs">
+                          <span className="text-slate-400 font-semibold text-3xs block">{label}</span>
+                          <strong className="text-slate-700 dark:text-slate-200 font-medium">{value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Clinical notes from staff */}
+                {selectedEncounter.clinical_notes && (
+                  <div className="p-3.5 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl text-xs">
+                    <span className="font-bold text-blue-600 dark:text-blue-400 block mb-1 text-3xs uppercase tracking-wider">Staff Clinical Notes</span>
+                    <p className="font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{selectedEncounter.clinical_notes}</p>
                   </div>
                 )}
               </section>
+
 
               <section className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-850 p-6 rounded-3xl shadow-sm space-y-4">
                 <h3 className="font-bold text-xs text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-2">
@@ -250,20 +294,20 @@ export default function DoctorDashboard() {
                     <div key={item.id} className="grid grid-cols-5 gap-3 items-end text-xs font-semibold">
                       <div className="col-span-2 space-y-1">
                         <label className="text-3xs block text-slate-400 uppercase">Medicine Name</label>
-                        <input required placeholder="e.g. Paracetamol" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register(`medicines.${index}.medicine_name` as const)} />
+                        <input required placeholder="e.g. Paracetamol" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register(`medicines.${index}.medicine_name`)} />
                       </div>
                       <div className="col-span-1 space-y-1">
                         <label className="text-3xs block text-slate-400 uppercase">Strength</label>
-                        <input placeholder="e.g. 500mg" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register(`medicines.${index}.strength` as const)} />
+                        <input placeholder="e.g. 500mg" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register(`medicines.${index}.strength`)} />
                       </div>
                       <div className="col-span-1 space-y-1">
                         <label className="text-3xs block text-slate-400 uppercase">Frequency</label>
-                        <input placeholder="e.g. 1-0-1" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register(`medicines.${index}.frequency` as const)} />
+                        <input placeholder="e.g. 1-0-1" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register(`medicines.${index}.frequency`)} />
                       </div>
                       <div className="col-span-1 flex items-center gap-2">
                         <div className="flex-1 space-y-1">
                           <label className="text-3xs block text-slate-400 uppercase">Duration</label>
-                          <input placeholder="e.g. 5 days" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register(`medicines.${index}.duration` as const)} />
+                          <input placeholder="e.g. 5 days" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register(`medicines.${index}.duration`)} />
                         </div>
                         {fields.length > 1 && (
                           <button 

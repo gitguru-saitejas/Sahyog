@@ -9,8 +9,8 @@ import {
 export default function AdminDashboard() {
   const { showToast } = useAuth();
   const [stats, setStats] = useState({ total_doctors: 0, total_staff: 0, total_departments: 0, total_encounters: 0 });
-  const [doctors, setDoctors] = useState<any[]>([]);
-  const [staff, setStaff] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState([]);
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchDashboardData = async () => {

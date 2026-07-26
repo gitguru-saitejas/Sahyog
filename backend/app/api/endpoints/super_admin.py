@@ -6,6 +6,8 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 import os
+import random
+import string
 
 from app.database.session import get_db
 from app.models.user import User
@@ -17,11 +19,11 @@ from app.core.config import settings
 from app.services.audit import log_audit
 from app.services import rag as rag_service
 from app.services.storage import delete_rag_document, create_signed_url
-from app.schemas.super_admin import (
+from app.schemas.super_admin_schema import (
     SuperAdminLoginRequest, SuperAdminTokenResponse, DashboardSummaryResponse,
     HospitalCreate, HospitalUpdate, HospitalDetailResponse, HospitalListResponse,
     KnowledgeDocumentDetailResponse, KnowledgeDocumentListResponse, AssignAdminRequest,
-    UserMiniResponse, HospitalAdminResponse, DepartmentResponse
+    UserMiniResponse, HospitalAdminResponse, DepartmentResponse, HospitalCreateResponse
 )
 
 router = APIRouter()
@@ -200,7 +202,7 @@ def list_hospitals(
         "total_pages": total_pages
     }
 
-@router.post("/hospitals", response_model=HospitalDetailResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/hospitals", response_model=HospitalCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_hospital(
     payload: HospitalCreate,
     current_admin: User = Depends(get_current_super_admin),
@@ -225,7 +227,7 @@ def create_hospital(
     db.commit()
     db.refresh(hospital)
 
-    # Auditing
+    # Auditing hospital creation
     log_audit(
         db=db,
         user_id=current_admin.id,
@@ -240,7 +242,53 @@ def create_hospital(
         }
     )
 
-    return HospitalDetailResponse(
+    # Automatically create the default Hospital Admin account
+    from app.models.patient import HospitalUser
+    from app.services.hospital import generate_secure_temp_password
+
+    # Format HOSXXXADM001 based on hospital count
+    hospital_count = db.query(Hospital).count()
+    employee_id = f"HOS{hospital_count:03d}ADM001"
+
+    # Ensure uniqueness of employee_id
+    while db.query(HospitalUser).filter(HospitalUser.employee_id == employee_id).first():
+        hospital_count += 1
+        employee_id = f"HOS{hospital_count:03d}ADM001"
+
+    # Generate guaranteed-complexity temporary password
+    temp_password = generate_secure_temp_password()
+    hashed_password = security.get_password_hash(temp_password)
+
+    admin_user = HospitalUser(
+        hospital_id=hospital.id,
+        employee_id=employee_id,
+        password_hash=hashed_password,
+        role="HOSPITAL_ADMIN",
+        first_name="Hospital",
+        last_name="Administrator",
+        status="ACTIVE",
+        is_first_login=True,
+        password_changed=False,
+    )
+    db.add(admin_user)
+    db.commit()
+    db.refresh(admin_user)
+
+    # Auditing admin creation
+    log_audit(
+        db=db,
+        user_id=current_admin.id,
+        action="CREATE",
+        table_name="hospital_users",
+        record_id=admin_user.id,
+        new_values={
+            "employee_id": admin_user.employee_id,
+            "role": admin_user.role,
+            "hospital_id": admin_user.hospital_id
+        }
+    )
+
+    return HospitalCreateResponse(
         id=hospital.id,
         name=hospital.name,
         address=hospital.address,
@@ -252,7 +300,9 @@ def create_hospital(
         is_active=True,
         doctor_count=0,
         departments=[],
-        assigned_admins=[]
+        assigned_admins=[],
+        admin_employee_id=employee_id,
+        admin_temp_password=temp_password
     )
 
 @router.get("/hospitals/{hospital_id}", response_model=HospitalDetailResponse)
@@ -400,6 +450,17 @@ def delete_hospital(
         )
 
     h.deleted_at = datetime.now(timezone.utc)
+
+    # Cascade soft-deactivate all hospital employees (admins, doctors, staff)
+    from app.models.patient import HospitalUser
+    employees = db.query(HospitalUser).filter(
+        HospitalUser.hospital_id == str(hospital_id),
+        HospitalUser.deleted_at == None
+    ).all()
+    for emp in employees:
+        emp.status = "INACTIVE"
+        emp.deleted_at = datetime.now(timezone.utc)
+
     db.commit()
     db.refresh(h)
 
@@ -509,6 +570,56 @@ def restore_hospital(
         assigned_admins=assigned_admins
     )
 
+@router.post("/hospitals/{hospital_id}/reset-admin-password")
+def reset_hospital_admin_password(
+    hospital_id: UUID,
+    current_admin: User = Depends(get_current_super_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Super Admin resets the Hospital Admin's password.
+    Generates a new secure temporary password, sets is_first_login=True
+    so that the Hospital Admin is forced to change it on their next login.
+    """
+    from app.models.patient import HospitalUser
+    from app.services.hospital import generate_secure_temp_password
+
+    # Find the hospital admin for this hospital
+    admin_user = db.query(HospitalUser).filter(
+        HospitalUser.hospital_id == str(hospital_id),
+        HospitalUser.role == "HOSPITAL_ADMIN",
+        HospitalUser.deleted_at == None
+    ).first()
+
+    if not admin_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active Hospital Admin found for this hospital."
+        )
+
+    new_temp_password = generate_secure_temp_password()
+    admin_user.password_hash = security.get_password_hash(new_temp_password)
+    admin_user.is_first_login = True
+    admin_user.password_changed = False
+    db.commit()
+
+    log_audit(
+        db=db,
+        user_id=current_admin.id,
+        action="UPDATE",
+        table_name="hospital_users",
+        record_id=admin_user.id,
+        old_values={"is_first_login": False},
+        new_values={"is_first_login": True, "reset_by": "SUPER_ADMIN"}
+    )
+
+    return {
+        "success": True,
+        "employee_id": admin_user.employee_id,
+        "new_temp_password": new_temp_password,
+        "message": "Hospital Admin password has been reset. Share the credentials securely."
+    }
+
 @router.get("/hospitals/admins/available", response_model=List[UserMiniResponse])
 def get_available_admins(
     current_admin: User = Depends(get_current_super_admin),
@@ -516,6 +627,7 @@ def get_available_admins(
 ):
     """Retrieves Hospital Admins who are active and not currently assigned to a hospital."""
     assigned_user_ids = db.query(HospitalAdmin.user_id).subquery()
+
     available_users = db.query(User).filter(
         User.role == "HOSPITAL_ADMIN",
         User.is_active == True,

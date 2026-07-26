@@ -74,7 +74,7 @@ class ForgotPasswordResetRequest(BaseModel):
 
 class RegisterCredentials(BaseModel):
     phone_number: str
-    password: str = Field(..., min_length=8)
+    password: Optional[str] = None  # Optional: if omitted, backend generates an internal password
 
     @field_validator('phone_number', mode='before')
     @classmethod
@@ -142,6 +142,26 @@ class EmployeeTokenResponse(BaseModel):
     role: str
     first_name: str
     last_name: str
+    is_first_login: bool = False
+    password_changed: bool = True
+
+class EmployeeChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_complexity(cls, v: str) -> str:
+        import re
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain at least one uppercase letter.')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain at least one lowercase letter.')
+        if not re.search(r'\d', v):
+            raise ValueError('Password must contain at least one number.')
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', v):
+            raise ValueError('Password must contain at least one special character.')
+        return v
 
 class EmployeeRefreshRequest(BaseModel):
     refresh_token: str

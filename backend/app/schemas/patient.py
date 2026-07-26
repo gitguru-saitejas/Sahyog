@@ -68,8 +68,8 @@ class DepartmentResponse(BaseModel):
         from_attributes = True
 
 class DoctorCreate(BaseModel):
-    employee_id: str
-    password: str
+    employee_id: Optional[str] = None
+    password: Optional[str] = None
     first_name: str
     last_name: str
     email: Optional[str] = None
@@ -113,9 +113,12 @@ class DoctorResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class DoctorCreateResponse(DoctorResponse):
+    temporary_password: Optional[str] = None
+
 class SupportStaffCreate(BaseModel):
-    employee_id: str
-    password: str
+    employee_id: Optional[str] = None
+    password: Optional[str] = None
     first_name: str
     last_name: str
     email: Optional[str] = None
@@ -146,6 +149,9 @@ class SupportStaffResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SupportStaffCreateResponse(SupportStaffResponse):
+    temporary_password: Optional[str] = None
 
 class EncounterCreate(BaseModel):
     patient_id: UUID

@@ -99,22 +99,7 @@ class PatientConsent(Base):
 
     patient = orm_relationship("Patient", back_populates="consents")
 
-class Hospital(Base):
-    __tablename__ = "hospitals"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=generate_uuid)
-    name = Column(String(255), nullable=False)
-
-class Department(Base):
-    __tablename__ = "departments"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=generate_uuid)
-    hospital_id = Column(UUID(as_uuid=False), ForeignKey("hospitals.id", ondelete="CASCADE"), nullable=False)
-    name = Column(String(100), nullable=False)
-    description = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+from app.models.hospital import Hospital, Department
 
 class HospitalUser(Base):
     __tablename__ = "hospital_users"
@@ -130,6 +115,8 @@ class HospitalUser(Base):
     phone = Column(String(20), nullable=True)
     department_id = Column(UUID(as_uuid=False), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     status = Column(String(20), default="ACTIVE", nullable=False) # ACTIVE, INACTIVE, LOCKED
+    is_first_login = Column(Boolean, default=True, nullable=False)  # True when employee uses a temp password
+    password_changed = Column(Boolean, default=False, nullable=False)  # False until employee sets own password
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

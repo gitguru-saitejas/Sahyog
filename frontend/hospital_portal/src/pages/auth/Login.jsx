@@ -22,10 +22,15 @@ export default function Login() {
     }
   });
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data) => {
     setErrorMessage("");
     try {
       const user = await loginAsEmployee(data.employee_id, data.password);
+      // If this is a first login (temp password), force a password change
+      if (user.is_first_login) {
+        navigate("/change-password");
+        return;
+      }
       if (user.role === "HOSPITAL_ADMIN") {
         navigate("/hospital/admin/dashboard");
       } else if (user.role === "DOCTOR") {
@@ -33,11 +38,12 @@ export default function Login() {
       } else if (user.role === "SUPPORT_STAFF") {
         navigate("/support/dashboard");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setErrorMessage(err.response?.data?.detail || "Login failed. Please check your credentials.");
     }
   };
+
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-955 flex flex-col justify-center items-center p-4 transition-colors duration-300">

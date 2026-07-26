@@ -9,7 +9,9 @@ from app.models.family_account import FamilyAccount, OTPVerification
 from app.models.patient import Patient
 from app.schemas.auth import (
     LoginRequest, TokenResponse, OTPRequest, OTPVerifyRequest,
-    RegisterRequest, ForgotPasswordResetRequest
+    RegisterRequest, ForgotPasswordResetRequest,
+    EmployeeLoginRequest, EmployeeTokenResponse, EmployeeRefreshRequest,
+    EmployeeChangePasswordRequest
 )
 from app.core import security
 
@@ -144,8 +146,10 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
         ).first()
 
         if not account:
-            # Create a new family account
-            password_hash = security.get_password_hash(request.credentials.password)
+            # Use provided password, or generate a secure internal one (OTP-only registration)
+            import secrets
+            raw_password = request.credentials.password or secrets.token_urlsafe(24)
+            password_hash = security.get_password_hash(raw_password)
             account = FamilyAccount(
                 phone_number=request.credentials.phone_number,
                 password_hash=password_hash
@@ -248,9 +252,8 @@ from fastapi import Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from app.core.config import settings
-from app.schemas.auth import EmployeeLoginRequest, EmployeeTokenResponse, EmployeeRefreshRequest
-from app.services.hospital import HospitalService
 from app.models.patient import HospitalUser
+from app.services.hospital import HospitalService
 
 security_scheme = HTTPBearer()
 
@@ -374,4 +377,52 @@ def employee_logout(
     # Simply return success since JWT is stateless (client discards it)
     # Could optionally blacklist or audit
     return {"success": True, "message": "Successfully logged out."}
+
+@router.post("/employee/change-password")
+def employee_change_password(
+    req: EmployeeChangePasswordRequest,
+    request: Request,
+    current_user: HospitalUser = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    """
+    Allows an employee to change their own password.
+    - On first login: clears is_first_login and sets password_changed to True.
+    - Can also be used for regular voluntary password changes.
+    """
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    service.change_own_password(
+        user_id=str(current_user.id),
+        current_password=req.current_password,
+        new_password=req.new_password,
+        ip_address=ip_address
+    )
+    return {"success": True, "message": "Password changed successfully. You can now access the dashboard."}
+
+@router.post("/employee/reset-password-auto")
+def employee_reset_password_auto(
+    target_employee_id: str,
+    request: Request,
+    current_user: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Hospital Admin auto-resets an employee's password (Doctor or Support Staff).
+    Generates a new secure temporary password and returns it for one-time display.
+    """
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    new_password = service.reset_employee_password_auto(
+        hospital_id=str(current_user.hospital_id),
+        target_employee_id=target_employee_id,
+        admin_id=str(current_user.id),
+        ip_address=ip_address
+    )
+    return {
+        "success": True,
+        "employee_id": target_employee_id,
+        "new_temp_password": new_password,
+        "message": "Password reset successfully. Share the new credentials with the employee."
+    }
 

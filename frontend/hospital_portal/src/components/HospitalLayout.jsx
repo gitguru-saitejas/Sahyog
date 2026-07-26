@@ -6,7 +6,7 @@ import {
   Menu, X, ClipboardList, Stethoscope, Search
 } from "lucide-react";
 
-export default function HospitalLayout({ children }: { children: React.ReactNode }) {
+export default function HospitalLayout({ children }) {
   const { employee, employeeLogout, theme, toggleTheme } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

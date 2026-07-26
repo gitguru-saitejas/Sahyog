@@ -27,6 +27,7 @@ export default function HospitalList() {
   });
   const [createError, setCreateError] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState(null);
 
   // Edit Modal state
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -85,10 +86,15 @@ export default function HospitalList() {
     setCreateLoading(true);
     setCreateError("");
     try {
-      await api.post("/hospitals", createForm);
+      const res = await api.post("/hospitals", createForm);
       setIsCreateOpen(false);
       setCreateForm({ name: "", email: "", contact_number: "", address: "", logo_url: "" });
       fetchHospitals();
+      setCreatedCredentials({
+        name: res.data.name,
+        employee_id: res.data.admin_employee_id,
+        password: res.data.admin_temp_password
+      });
     } catch (err) {
       setCreateError(err.response?.data?.detail || "Failed to create hospital. Please check entries.");
     } finally {
@@ -543,6 +549,66 @@ export default function HospitalList() {
         confirmText="Restore"
         isDestructive={false}
       />
+
+      {/* Hospital Admin Credentials Success Modal */}
+      {createdCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setCreatedCredentials(null)} />
+          <div className="relative w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl animate-fade-in z-10 text-white space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto">
+                <CheckCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold font-display">Hospital Created Successfully</h3>
+              <p className="text-xs text-muted-foreground">Default Hospital Administrator account has been provisioned.</p>
+            </div>
+
+            <div className="p-4 bg-secondary/50 border border-border rounded-lg space-y-3.5 text-xs font-semibold">
+              <div>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Hospital Node</span>
+                <strong className="text-sm font-bold">{createdCredentials.name}</strong>
+              </div>
+              
+              <div className="border-t border-border/50 pt-3">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Employee ID (Username)</span>
+                <code className="text-sm font-mono font-bold bg-input px-2 py-0.5 rounded border border-border/50 select-all block mt-1 w-fit">{createdCredentials.employee_id}</code>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Temporary Password</span>
+                <code className="text-sm font-mono font-bold bg-input px-2 py-0.5 rounded border border-border/50 select-all block mt-1 w-fit">{createdCredentials.password}</code>
+              </div>
+            </div>
+
+            <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 rounded-lg flex items-start gap-2.5">
+              <Info className="w-4 h-4 shrink-0 mt-0.5" />
+              <p className="leading-normal">Please copy and share these credentials securely with the hospital admin. The temporary password will only be shown once.</p>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                onClick={() => {
+                  const text = `Hospital: ${createdCredentials.name}\nEmployee ID: ${createdCredentials.employee_id}\nTemporary Password: ${createdCredentials.password}`;
+                  navigator.clipboard.writeText(text);
+                  alert("Credentials copied to clipboard!");
+                }}
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-muted-foreground hover:text-white transition-all duration-150"
+              >
+                Copy Credentials
+              </button>
+              <button
+                onClick={() => {
+                  window.open("http://localhost:5174/employee-login", "_blank");
+                  setCreatedCredentials(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/95 transition-all duration-150 shadow-lg shadow-primary/10"
+              >
+                Proceed to Hospital Login
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

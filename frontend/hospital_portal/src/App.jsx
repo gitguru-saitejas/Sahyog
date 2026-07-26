@@ -4,8 +4,9 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import GlobalToast from "./components/GlobalToast";
 import HospitalLayout from "./components/HospitalLayout";
 
-// Employee Auth Page
+// Employee Auth Pages
 import Login from "./pages/auth/Login";
+import ChangePassword from "./pages/auth/ChangePassword";
 
 // Admin Subpages & Layout
 import HospitalAdminLayout from "./components/HospitalAdminLayout";
@@ -23,28 +24,28 @@ import StaffDashboard from "./pages/support/StaffDashboard";
 import ClinicalTriage from "./pages/support/ClinicalTriage";
 
 // Guards
-const DoctorRoute = ({ children }: { children: React.ReactNode }) => {
+const DoctorRoute = ({ children }) => {
   const { employee } = useAuth();
   if (!employee) return <Navigate to="/employee-login" replace />;
   if (employee.role !== "DOCTOR") return <Navigate to="/employee-login" replace />;
   return <HospitalLayout>{children}</HospitalLayout>;
 };
 
-const SupportRoute = ({ children }: { children: React.ReactNode }) => {
+const SupportRoute = ({ children }) => {
   const { employee } = useAuth();
   if (!employee) return <Navigate to="/employee-login" replace />;
   if (employee.role !== "SUPPORT_STAFF") return <Navigate to="/employee-login" replace />;
   return <HospitalLayout>{children}</HospitalLayout>;
 };
 
-const App: React.FC = () => {
+const App = () => {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Default Root */}
           <Route path="/" element={<Navigate to="/employee-login" replace />} />
           <Route path="/employee-login" element={<Login />} />
+          <Route path="/change-password" element={<ChangePassword />} />
 
           {/* Nested Hospital Admin routes */}
           <Route path="/hospital/admin" element={<HospitalAdminLayout />}>

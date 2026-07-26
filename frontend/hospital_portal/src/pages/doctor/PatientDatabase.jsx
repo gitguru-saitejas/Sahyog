@@ -6,10 +6,10 @@ import { Search, User, FileText } from "lucide-react";
 export default function PatientDatabase() {
   const { showToast } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     setLoading(true);

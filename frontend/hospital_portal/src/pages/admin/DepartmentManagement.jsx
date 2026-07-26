@@ -8,9 +8,9 @@ import {
 
 export default function DepartmentManagement() {
   const { showToast } = useAuth();
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [doctors, setDoctors] = useState<any[]>([]);
-  const [staff, setStaff] = useState<any[]>([]);
+  const [departments, setDepartments] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -40,14 +40,14 @@ export default function DepartmentManagement() {
     loadDepartmentsData();
   }, []);
 
-  const onAddSubmit = async (data: any) => {
+  const onAddSubmit = async (data) => {
     try {
       await api.post("/patients/hospital/admin/departments", data);
       showToast("success", `Department ${data.name} created successfully.`);
       setIsAddModalOpen(false);
       addForm.reset();
       loadDepartmentsData();
-    } catch (err: any) {
+    } catch (err) {
       showToast("error", err.response?.data?.detail || "Failed to create department.");
     }
   };

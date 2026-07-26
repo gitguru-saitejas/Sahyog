@@ -6,7 +6,7 @@ import { ClipboardList, Activity, RefreshCcw, CheckCircle } from "lucide-react";
 export default function StaffDashboard() {
   const { showToast } = useAuth();
   const [stats, setStats] = useState({ pending_triage: 0, total_logged: 0 });
-  const [queue, setQueue] = useState<any[]>([]);
+  const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchStaffDashboard = async () => {
@@ -17,7 +17,7 @@ export default function StaffDashboard() {
       const encounters = encRes.data.encounters || [];
       setQueue(encounters);
       setStats({
-        pending_triage: encounters.filter((e: any) => e.status === "PENDING").length,
+        pending_triage: encounters.filter((e) => e.status === "PENDING").length,
         total_logged: encounters.length
       });
     } catch (err) {
