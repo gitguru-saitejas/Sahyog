@@ -837,37 +837,24 @@ def upload_knowledge_document(
     current_admin: User = Depends(get_current_super_admin),
     db: Session = Depends(get_db)
 ):
-    h_id = None
-    if hospital_id and hospital_id.lower() != "null" and hospital_id.strip() != "":
-        try:
-            h_id = str(UUID(hospital_id))
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid hospital_id UUID format."
-            )
-        # Ensure hospital exists
-        h = db.query(Hospital).filter(Hospital.id == h_id).first()
-        if not h:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Hospital associated with this scope does not exist."
-            )
-
     try:
         doc = rag_service.ingest_document(
             db=db,
-            hospital_id=h_id,
+            hospital_id=hospital_id,
             uploaded_by=current_admin.id,
             title=title,
             category=category,
             version=version,
             file=file
         )
-    except HTTPException:
+    except HTTPException as he:
+        import traceback
+        traceback.print_exc()
         # Pass HTTPExceptions from service
-        raise
+        raise he
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to complete ingestion pipeline: {str(e)}"

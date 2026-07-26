@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "rag-documents"
 
+    # Embedding Configurations
+    EMBEDDING_PROVIDER: str = "ollama"
+    EMBEDDING_MODEL: str = "mxbai-embed-large"
+    EMBEDDING_DIMENSIONS: int = 1024
+    OLLAMA_API_URL: str = "http://localhost:11434"
+
     # CORS Allowed origins
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",

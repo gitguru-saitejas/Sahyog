@@ -160,7 +160,7 @@ export default function DocumentDetail() {
 
               <div className="pt-2 border-t border-border flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Embedding Dimensions:</span>
-                <span className="text-xs font-bold text-white">1536 VECTOR</span>
+                <span className="text-xs font-bold text-white">1024 VECTOR</span>
               </div>
 
               <div className="flex items-center justify-between">

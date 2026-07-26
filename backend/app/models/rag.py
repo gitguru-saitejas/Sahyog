@@ -5,12 +5,13 @@ from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime, timezone
 from app.database.session import Base
+from app.core.config import settings
 
 def generate_uuid():
     return str(uuid.uuid4())
 
 class PGVector(UserDefinedType):
-    def __init__(self, dim=1536):
+    def __init__(self, dim=settings.EMBEDDING_DIMENSIONS):
         self.dim = dim
 
     def get_col_spec(self, **kw):
@@ -59,7 +60,7 @@ class DocumentChunk(Base):
     document_id = Column(UUID(as_uuid=False), ForeignKey("rag_documents.id", ondelete="CASCADE"), nullable=False)
     chunk_index = Column(Integer, nullable=False)
     content = Column(String, nullable=False)
-    embedding = Column(PGVector(1536), nullable=False)
+    embedding = Column(PGVector(settings.EMBEDDING_DIMENSIONS), nullable=False)
     metadata_dict = Column("metadata", JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 

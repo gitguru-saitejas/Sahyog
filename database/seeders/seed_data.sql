@@ -160,10 +160,10 @@ INSERT INTO document_chunks (id, document_id, chunk_index, content, embedding) V
 (uuid_generate_v4(), 'ffffffff-ffff-ffff-ffff-ffffffffffff', 1, 
  'Hypertension management requires dietary adjustments. Sodium intake should be restricted to less than 2 grams per day (equivalent to 5 grams of salt). Regular physical activity such as walking 30 minutes daily improves cardiac output and reduces vascular stiffness.', 
  -- Array format casted to pgvector
- ARRAY_FILL(0.01::float, ARRAY[1536])::vector
+ ARRAY_FILL(0.01::float, ARRAY[1024])::vector
 ),
 (uuid_generate_v4(), 'ffffffff-ffff-ffff-ffff-ffffffffffff', 2, 
  'Pharmacological therapies for blood pressure: Angiotensin-Converting Enzyme (ACE) inhibitors, Beta-Blockers, and Calcium Channel Blockers like Amlodipine are primary choices. Dosage ranges from 2.5mg to 10mg daily based on target blood pressure thresholds.', 
- ARRAY_FILL(0.02::float, ARRAY[1536])::vector
+ ARRAY_FILL(0.02::float, ARRAY[1024])::vector
 )
 ON CONFLICT (document_id, chunk_index) DO NOTHING;

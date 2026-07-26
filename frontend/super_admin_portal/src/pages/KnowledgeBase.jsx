@@ -114,7 +114,8 @@ export default function KnowledgeBase() {
 
     try {
       await api.post("/knowledge-base/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 180000
       });
       setIsUploadOpen(false);
       setUploadForm({

@@ -1,12 +1,18 @@
 # Environment
+# Environment
 .env
 .env.*
 **/.env
 !.env.example
 
 # Node
+!.env.example
+
+# Node
 node_modules/
 **/node_modules/
+
+# Frontend builds
 
 # Frontend builds
 dist/

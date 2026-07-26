@@ -520,7 +520,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     document_id UUID NOT NULL,
     chunk_index INT NOT NULL,
     content TEXT NOT NULL,
-    embedding VECTOR(1536) NOT NULL,
+    embedding VECTOR(1024) NOT NULL,
     metadata JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     

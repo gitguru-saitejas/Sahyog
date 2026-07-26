@@ -30,11 +30,11 @@ SELECT
     d.title AS source_document,
     c.chunk_index,
     c.content,
-    1 - (c.embedding <=> ARRAY_FILL(0.015::float, ARRAY[1536])::vector) AS similarity_score
+    1 - (c.embedding <=> ARRAY_FILL(0.015::float, ARRAY[1024])::vector) AS similarity_score
 FROM document_chunks c
 JOIN rag_documents d ON c.document_id = d.id
 WHERE (d.hospital_id IS NULL OR d.hospital_id = '11111111-1111-1111-1111-111111111111')
-  AND 1 - (c.embedding <=> ARRAY_FILL(0.015::float, ARRAY[1536])::vector) > 0.70
+  AND 1 - (c.embedding <=> ARRAY_FILL(0.015::float, ARRAY[1024])::vector) > 0.70
 ORDER BY similarity_score DESC
 LIMIT 5;
 
