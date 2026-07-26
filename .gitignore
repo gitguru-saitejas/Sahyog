@@ -2,3 +2,8 @@
 .env
 .env.*
 **/.env
+node_modules/
+**/node_modules/
+!.env.example
+dist/
+**/dist/
