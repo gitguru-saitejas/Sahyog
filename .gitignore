@@ -1,12 +1,26 @@
-# Environment files
+# Environment
 .env
 .env.*
 **/.env
+!.env.example
 
-# Node dependencies
+# Node
 node_modules/
 **/node_modules/
 
-# Build output
+# Frontend builds
 dist/
 **/dist/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Python environments
+.venv/
+venv/
+
+# Local databases
+*.db
