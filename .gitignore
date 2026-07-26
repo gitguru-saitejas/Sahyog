@@ -1,4 +1,26 @@
-# Environment files
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Python virtual environments
+.venv/
+venv/
+
+# Local databases
+*.db
+
+# Environment
 .env
 .env.*
 **/.env
+!.env.example
+
+# Node
+node_modules/
+**/node_modules/
+
+# Frontend build
+dist/
+**/dist/

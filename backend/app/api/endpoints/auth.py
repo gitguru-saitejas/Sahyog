@@ -240,3 +240,138 @@ def reset_password(request: ForgotPasswordResetRequest, db: Session = Depends(ge
     db.commit()
 
     return {"message": "Password updated successfully."}
+
+# ---------------------------------------------------------
+# HOSPITAL EMPLOYEES SECURITY & AUTHENTICATION ENDPOINTS
+# ---------------------------------------------------------
+from fastapi import Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError
+from app.core.config import settings
+from app.schemas.auth import EmployeeLoginRequest, EmployeeTokenResponse, EmployeeRefreshRequest
+from app.services.hospital import HospitalService
+from app.models.patient import HospitalUser
+
+security_scheme = HTTPBearer()
+
+def get_current_employee(
+    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+    db: Session = Depends(get_db)
+) -> HospitalUser:
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token credentials."
+            )
+        
+        user = db.query(HospitalUser).filter(
+            HospitalUser.id == user_id, HospitalUser.deleted_at == None
+        ).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Employee account not found or has been deleted."
+            )
+            
+        if user.status != "ACTIVE":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is locked or inactive."
+            )
+            
+        return user
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token is expired or invalid."
+        )
+
+def require_hospital_admin(current_user: HospitalUser = Depends(get_current_employee)) -> HospitalUser:
+    if current_user.role != "HOSPITAL_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation restricted to Hospital Administrators only."
+        )
+    return current_user
+
+def require_doctor(current_user: HospitalUser = Depends(get_current_employee)) -> HospitalUser:
+    if current_user.role != "DOCTOR":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation restricted to Doctors only."
+        )
+    return current_user
+
+def require_support_staff(current_user: HospitalUser = Depends(get_current_employee)) -> HospitalUser:
+    if current_user.role != "SUPPORT_STAFF":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation restricted to Support Staff only."
+        )
+    return current_user
+
+def require_hospital_user(current_user: HospitalUser = Depends(get_current_employee)) -> HospitalUser:
+    if current_user.role not in ["HOSPITAL_ADMIN", "DOCTOR", "SUPPORT_STAFF"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation restricted to active hospital employees."
+        )
+    return current_user
+
+@router.post("/employee/login", response_model=EmployeeTokenResponse)
+def employee_login(
+    req: EmployeeLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    return service.employee_login(req.employee_id, req.password, ip_address)
+
+@router.post("/employee/refresh", response_model=EmployeeTokenResponse)
+def employee_refresh(
+    req: EmployeeRefreshRequest,
+    db: Session = Depends(get_db)
+):
+    # Verify refresh token and issue a new pair
+    try:
+        payload = jwt.decode(req.refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid refresh token.")
+        
+        user = db.query(HospitalUser).filter(
+            HospitalUser.id == user_id, HospitalUser.deleted_at == None, HospitalUser.status == "ACTIVE"
+        ).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Employee not active or not found.")
+            
+        access_token = security.create_access_token(subject=user.id, expires_delta=timedelta(minutes=60))
+        new_refresh_token = security.create_access_token(subject=user.id, expires_delta=timedelta(days=7))
+        
+        return {
+            "accessToken": access_token,
+            "refreshToken": new_refresh_token,
+            "user_id": user.id,
+            "hospital_id": user.hospital_id,
+            "employee_id": user.employee_id,
+            "role": user.role,
+            "first_name": user.first_name,
+            "last_name": user.last_name
+        }
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token.")
+
+@router.post("/employee/logout")
+def employee_logout(
+    current_user: HospitalUser = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    # Simply return success since JWT is stateless (client discards it)
+    # Could optionally blacklist or audit
+    return {"success": True, "message": "Successfully logged out."}
+

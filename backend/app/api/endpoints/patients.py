@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from jose import jwt, JWTError
 import hashlib
 from datetime import datetime, timezone
@@ -107,44 +107,245 @@ def add_family_member(
 
     return patient
 
-@router.post("/link", response_model=PatientResponse)
-def link_existing_profile(
-    request: LinkExistingRequest,
-    current_acc_id: str = Depends(get_current_account_id),
+    return patient
+
+# ---------------------------------------------------------
+# HOSPITAL PORTAL ROLE APIS (ADMIN, DOCTOR, SUPPORT STAFF)
+# ---------------------------------------------------------
+from fastapi import Request
+from app.api.endpoints.auth import (
+    require_hospital_admin, require_doctor, require_support_staff, require_hospital_user
+)
+from app.models.patient import HospitalUser, Department, Encounter, Prescription
+from app.schemas.patient import (
+    DepartmentCreate, DepartmentResponse,
+    DoctorCreate, DoctorUpdate, DoctorResponse,
+    SupportStaffCreate, SupportStaffUpdate, SupportStaffResponse,
+    EncounterCreate, EncounterUpdate, EncounterResponse,
+    PrescriptionCreate, PrescriptionResponse
+)
+from app.services.hospital import HospitalService
+
+# ---------------------------
+# HOSPITAL ADMIN APIS
+# ---------------------------
+@router.post("/hospital/admin/doctors", response_model=DoctorResponse, tags=["hospital-admin"])
+def create_doctor(
+    req: DoctorCreate,
+    request: Request,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
     db: Session = Depends(get_db)
 ):
-    if str(request.family_account_id) != current_acc_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operation forbidden. Link target must match your account."
-        )
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    user = service.create_doctor(str(current_admin.hospital_id), req.model_dump(), str(current_admin.id), ip_address)
+    return user
 
-    # Verify phone OTP
-    otp_rec = db.query(OTPVerification).filter(
-        OTPVerification.phone_number == request.phone_number,
-        OTPVerification.verified == True
-    ).order_by(OTPVerification.created_at.desc()).first()
+@router.get("/hospital/admin/doctors", response_model=List[DoctorResponse], tags=["hospital-admin"])
+def list_doctors(
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    return service.repo.get_employees_by_role(str(current_admin.hospital_id), "DOCTOR")
 
-    if not otp_rec or otp_rec.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification credentials have expired. Verify OTP first."
-        )
+@router.get("/hospital/admin/doctors/{user_id}", response_model=DoctorResponse, tags=["hospital-admin"])
+def get_doctor(
+    user_id: str,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    user = service.repo.get_employee(str(current_admin.hospital_id), user_id)
+    if not user or user.role != "DOCTOR":
+        raise HTTPException(status_code=404, detail="Doctor not found.")
+    return user
 
-    # Find the target patient profile with this Aadhaar
-    aadhaar_hash = hashlib.sha256(request.patient_aadhaar.encode()).hexdigest()
-    patient = db.query(Patient).filter(Patient.aadhaar_hash == aadhaar_hash).first()
-    
-    if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Patient profile with specified Aadhaar was not found."
-        )
+@router.put("/hospital/admin/doctors/{user_id}", response_model=DoctorResponse, tags=["hospital-admin"])
+def update_doctor(
+    user_id: str,
+    req: DoctorUpdate,
+    request: Request,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    return service.update_doctor(str(current_admin.hospital_id), user_id, req.model_dump(exclude_unset=True), str(current_admin.id), ip_address)
 
-    # Re-link profile to current family account
-    patient.family_account_id = request.family_account_id
-    otp_rec.verified = False  # Consume verification
-    db.commit()
-    db.refresh(patient)
+@router.delete("/hospital/admin/doctors/{user_id}", tags=["hospital-admin"])
+def delete_doctor(
+    user_id: str,
+    request: Request,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    service.delete_employee(str(current_admin.hospital_id), user_id, str(current_admin.id), ip_address)
+    return {"success": True, "message": "Doctor profile soft-deleted successfully."}
 
-    return patient
+@router.post("/hospital/admin/staff", response_model=SupportStaffResponse, tags=["hospital-admin"])
+def create_staff(
+    req: SupportStaffCreate,
+    request: Request,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    user = service.create_support_staff(str(current_admin.hospital_id), req.model_dump(), str(current_admin.id), ip_address)
+    return user
+
+@router.get("/hospital/admin/staff", response_model=List[SupportStaffResponse], tags=["hospital-admin"])
+def list_staff(
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    return service.repo.get_employees_by_role(str(current_admin.hospital_id), "SUPPORT_STAFF")
+
+@router.get("/hospital/admin/staff/{user_id}", response_model=SupportStaffResponse, tags=["hospital-admin"])
+def get_staff(
+    user_id: str,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    user = service.repo.get_employee(str(current_admin.hospital_id), user_id)
+    if not user or user.role != "SUPPORT_STAFF":
+        raise HTTPException(status_code=404, detail="Support staff member not found.")
+    return user
+
+@router.put("/hospital/admin/staff/{user_id}", response_model=SupportStaffResponse, tags=["hospital-admin"])
+def update_staff(
+    user_id: str,
+    req: SupportStaffUpdate,
+    request: Request,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    return service.update_support_staff(str(current_admin.hospital_id), user_id, req.model_dump(exclude_unset=True), str(current_admin.id), ip_address)
+
+@router.delete("/hospital/admin/staff/{user_id}", tags=["hospital-admin"])
+def delete_staff(
+    user_id: str,
+    request: Request,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    service.delete_employee(str(current_admin.hospital_id), user_id, str(current_admin.id), ip_address)
+    return {"success": True, "message": "Support staff profile soft-deleted successfully."}
+
+@router.post("/hospital/admin/departments", response_model=DepartmentResponse, tags=["hospital-admin"])
+def create_department(
+    req: DepartmentCreate,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    return service.repo.create_department(str(current_admin.hospital_id), req.name, req.description)
+
+@router.get("/hospital/admin/departments", response_model=List[DepartmentResponse], tags=["hospital-admin"])
+def list_departments(
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    return service.repo.get_departments(str(current_admin.hospital_id))
+
+@router.post("/hospital/admin/reset-password", tags=["hospital-admin"])
+def reset_employee_password(
+    employee_id: str,
+    new_password: str,
+    request: Request,
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    service.reset_employee_password(str(current_admin.hospital_id), employee_id, new_password, str(current_admin.id), ip_address)
+    return {"success": True, "message": "Employee password updated successfully."}
+
+@router.get("/hospital/admin/dashboard", tags=["hospital-admin"])
+def get_admin_dashboard(
+    current_admin: HospitalUser = Depends(require_hospital_admin),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    return service.get_dashboard_summary(str(current_admin.hospital_id))
+
+# ---------------------------
+# HOSPITAL SUPPORT STAFF APIS
+# ---------------------------
+@router.get("/hospital/staff/search", response_model=List[PatientResponse], tags=["hospital-staff"])
+def staff_search_patients(
+    query: str,
+    current_staff: HospitalUser = Depends(require_support_staff),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    return service.get_patient_by_query(query)
+
+@router.post("/hospital/staff/encounters", response_model=EncounterResponse, tags=["hospital-staff"])
+def create_or_update_encounter(
+    req: EncounterCreate,
+    request: Request,
+    encounter_id: Optional[str] = None,
+    current_staff: HospitalUser = Depends(require_support_staff),
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    data = req.model_dump(exclude_unset=True)
+    if encounter_id:
+        data["encounter_id"] = encounter_id
+    encounter = service.create_or_update_encounter(str(current_staff.hospital_id), str(current_staff.id), data, ip_address)
+    return encounter
+
+# ---------------------------
+# HOSPITAL DOCTOR APIS
+# ---------------------------
+@router.get("/hospital/doctor/dashboard", tags=["hospital-doctor"])
+def get_doctor_dashboard(
+    current_doctor: HospitalUser = Depends(require_doctor),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    return service.get_doctor_dashboard(str(current_doctor.hospital_id), str(current_doctor.id))
+
+@router.get("/hospital/doctor/search", response_model=List[PatientResponse], tags=["hospital-doctor"])
+def doctor_search_patients(
+    query: str,
+    current_doctor: HospitalUser = Depends(require_doctor),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    return service.get_patient_by_query(query)
+
+@router.get("/hospital/doctor/patients/{patient_id}/timeline", response_model=List[EncounterResponse], tags=["hospital-doctor"])
+def get_patient_timeline(
+    patient_id: str,
+    current_doctor: HospitalUser = Depends(require_doctor),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    # Ensure isolation - only list encounters for this hospital
+    return service.repo.get_encounters(str(current_doctor.hospital_id), patient_id=patient_id)
+
+@router.post("/hospital/doctor/encounters/{encounter_id}/complete", response_model=EncounterResponse, tags=["hospital-doctor"])
+def complete_consultation(
+    encounter_id: str,
+    req: PrescriptionCreate,
+    request: Request,
+    current_doctor: HospitalUser = Depends(require_doctor),
+    db: Session = Depends(get_db)
+):
+    ip_address = request.client.host if request.client else None
+    service = HospitalService(db)
+    return service.complete_consultation(str(current_doctor.hospital_id), encounter_id, str(current_doctor.id), req.model_dump(), ip_address)
+

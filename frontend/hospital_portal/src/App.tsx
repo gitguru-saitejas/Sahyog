@@ -1,0 +1,103 @@
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import GlobalToast from "./components/GlobalToast";
+import HospitalLayout from "./components/HospitalLayout";
+
+// Employee Auth Page
+import Login from "./pages/auth/Login";
+
+// Admin Subpages & Layout
+import HospitalAdminLayout from "./components/HospitalAdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import DoctorManagement from "./pages/admin/DoctorManagement";
+import StaffManagement from "./pages/admin/StaffManagement";
+import DepartmentManagement from "./pages/admin/DepartmentManagement";
+
+// Doctor Pages
+import DoctorDashboard from "./pages/doctor/DoctorDashboard";
+import PatientDatabase from "./pages/doctor/PatientDatabase";
+
+// Support Staff Pages
+import StaffDashboard from "./pages/support/StaffDashboard";
+import ClinicalTriage from "./pages/support/ClinicalTriage";
+
+// Guards
+const DoctorRoute = ({ children }: { children: React.ReactNode }) => {
+  const { employee } = useAuth();
+  if (!employee) return <Navigate to="/employee-login" replace />;
+  if (employee.role !== "DOCTOR") return <Navigate to="/employee-login" replace />;
+  return <HospitalLayout>{children}</HospitalLayout>;
+};
+
+const SupportRoute = ({ children }: { children: React.ReactNode }) => {
+  const { employee } = useAuth();
+  if (!employee) return <Navigate to="/employee-login" replace />;
+  if (employee.role !== "SUPPORT_STAFF") return <Navigate to="/employee-login" replace />;
+  return <HospitalLayout>{children}</HospitalLayout>;
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Default Root */}
+          <Route path="/" element={<Navigate to="/employee-login" replace />} />
+          <Route path="/employee-login" element={<Login />} />
+
+          {/* Nested Hospital Admin routes */}
+          <Route path="/hospital/admin" element={<HospitalAdminLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="doctors" element={<DoctorManagement />} />
+            <Route path="staff" element={<StaffManagement />} />
+            <Route path="departments" element={<DepartmentManagement />} />
+          </Route>
+
+          {/* Doctor routes */}
+          <Route
+            path="/doctor/dashboard"
+            element={
+              <DoctorRoute>
+                <DoctorDashboard />
+              </DoctorRoute>
+            }
+          />
+          <Route
+            path="/doctor/patients"
+            element={
+              <DoctorRoute>
+                <PatientDatabase />
+              </DoctorRoute>
+            }
+          />
+
+          {/* Support Staff routes */}
+          <Route
+            path="/support/dashboard"
+            element={
+              <SupportRoute>
+                <StaffDashboard />
+              </SupportRoute>
+            }
+          />
+          <Route
+            path="/support/encounter"
+            element={
+              <SupportRoute>
+                <ClinicalTriage />
+              </SupportRoute>
+            }
+          />
+
+          {/* Wildcard redirect */}
+          <Route path="*" element={<Navigate to="/employee-login" replace />} />
+        </Routes>
+        <GlobalToast />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+};
+
+export default App;

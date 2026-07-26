@@ -9,6 +9,7 @@ import FamilySelection from "./pages/FamilySelection";
 import Dashboard from "./pages/Dashboard";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 
+
 // Route Guards
 const ProtectedRoute = ({ children }) => {
   const { familyAccountId } = useAuth();
@@ -123,6 +124,7 @@ export const App = () => {
               </ProtectedRoute>
             }
           />
+
 
           {/* Root redirect */}
           <Route path="*" element={<Navigate to="/login" replace />} />

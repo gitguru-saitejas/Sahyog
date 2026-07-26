@@ -128,3 +128,21 @@ class RegisterRequest(BaseModel):
     emergency: Optional[RegisterEmergency] = None
     medical: Optional[RegisterMedical] = None
     consent: Optional[RegisterConsent] = None
+
+class EmployeeLoginRequest(BaseModel):
+    employee_id: str = Field(..., min_length=3)
+    password: str = Field(..., min_length=6)
+
+class EmployeeTokenResponse(BaseModel):
+    accessToken: str
+    refreshToken: str
+    user_id: str
+    hospital_id: str
+    employee_id: str
+    role: str
+    first_name: str
+    last_name: str
+
+class EmployeeRefreshRequest(BaseModel):
+    refresh_token: str
+
