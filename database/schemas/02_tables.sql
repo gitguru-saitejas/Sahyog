@@ -6,6 +6,50 @@
 -- MODULE 1: AUTHENTICATION & SESSION MANAGEMENT
 -- =========================================================================
 
+-- Enums for Patient Data (safely checks if type exists before creating)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'relation_type') THEN
+        CREATE TYPE relation_type AS ENUM ('SELF', 'SPOUSE', 'SON', 'DAUGHTER', 'FATHER', 'MOTHER', 'BROTHER', 'SISTER', 'OTHER');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'gender_type') THEN
+        CREATE TYPE gender_type AS ENUM ('MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY');
+    END IF;
+END
+$$;
+
+CREATE TABLE IF NOT EXISTS family_accounts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone_number VARCHAR(20) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS family_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    family_account_id UUID NOT NULL,
+    refresh_token VARCHAR(500) NOT NULL UNIQUE,
+    ip_address INET,
+    user_agent TEXT,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_family_sessions_account FOREIGN KEY (family_account_id) REFERENCES family_accounts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS otp_verifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone_number VARCHAR(20) NOT NULL,
+    otp_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    attempt_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) NOT NULL,
@@ -151,21 +195,82 @@ CREATE TABLE IF NOT EXISTS appointment_slots (
 
 CREATE TABLE IF NOT EXISTS patients (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL,
-    date_of_birth DATE NOT NULL,
-    gender VARCHAR(20) NOT NULL,
+    family_account_id UUID NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    date_of_birth DATE,
+    gender gender_type,
     blood_group VARCHAR(5),
-    emergency_contact_name VARCHAR(150),
-    emergency_contact_phone VARCHAR(20),
-    address TEXT,
+    relation relation_type NOT NULL DEFAULT 'SELF',
+    aadhaar_hash VARCHAR(64) NOT NULL UNIQUE,
+    aadhaar_last4 CHAR(4) NOT NULL,
+    address_line1 VARCHAR(255),
+    address_line2 VARCHAR(255),
+    city VARCHAR(100),
+    district VARCHAR(100),
+    state VARCHAR(100),
+    pincode VARCHAR(6),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ,
     
-    CONSTRAINT fk_patients_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT uq_patients_user UNIQUE (user_id),
-    CONSTRAINT chk_patients_gender CHECK (gender IN ('MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY')),
+    CONSTRAINT fk_patients_family_account FOREIGN KEY (family_account_id) REFERENCES family_accounts(id) ON DELETE CASCADE,
     CONSTRAINT chk_patients_blood CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'))
+);
+
+CREATE TABLE IF NOT EXISTS patient_emergency_contacts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    patient_id UUID NOT NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    relationship VARCHAR(50) NOT NULL,
+    phone_number VARCHAR(20) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_emergency_contact_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS patient_conditions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    patient_id UUID NOT NULL,
+    condition_name VARCHAR(255) NOT NULL,
+    diagnosed_date DATE,
+    status VARCHAR(50) DEFAULT 'ACTIVE',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_conditions_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS patient_allergies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    patient_id UUID NOT NULL,
+    allergen VARCHAR(255) NOT NULL,
+    severity VARCHAR(20) CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_allergies_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS patient_medications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    patient_id UUID NOT NULL,
+    medicine_name VARCHAR(255) NOT NULL,
+    dosage VARCHAR(100) NOT NULL,
+    frequency VARCHAR(100) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_medications_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS patient_consents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    patient_id UUID NOT NULL,
+    consent_type VARCHAR(100) NOT NULL,
+    accepted BOOLEAN NOT NULL DEFAULT TRUE,
+    accepted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ip_address INET,
+    version VARCHAR(20) NOT NULL,
+    
+    CONSTRAINT fk_consents_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS medical_history (
