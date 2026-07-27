@@ -12,8 +12,8 @@ export default function StaffDashboard() {
   const fetchStaffDashboard = async () => {
     setLoading(true);
     try {
-      // Fetch clinic lists or doctor queues for triage summaries
-      const encRes = await api.get("/patients/hospital/doctor/dashboard"); 
+      // Fetch clinic lists or doctor queues for triage summaries from the correct staff dashboard API
+      const encRes = await api.get("/patients/hospital/staff/dashboard"); 
       const encounters = encRes.data.encounters || [];
       setQueue(encounters);
       setStats({
@@ -60,7 +60,7 @@ export default function StaffDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-855 p-5 rounded-2xl flex items-center gap-4 shadow-sm">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-slate-800/80 text-amber-600 dark:text-amber-450 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-slate-800/80 text-amber-600 dark:text-amber-455 flex items-center justify-center shrink-0">
             <Activity className="h-5 w-5 animate-pulse" />
           </div>
           <div>
@@ -89,8 +89,12 @@ export default function StaffDashboard() {
             queue.map((q, idx) => (
               <div key={idx} className="flex justify-between items-center gap-3 p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-850">
                 <div className="text-xs">
-                  <h4 className="font-bold text-slate-800 dark:text-slate-150">Patient Visit</h4>
-                  <p className="text-3xs text-slate-400 font-semibold">Triage status: {q.status}</p>
+                  <h4 className="font-bold text-slate-800 dark:text-slate-150">
+                    {q.patient ? `${q.patient.first_name} ${q.patient.last_name}` : "Patient Visit"}
+                  </h4>
+                  <p className="text-3xs text-slate-400 font-semibold">
+                    UHID: {q.patient?.patient_code || "N/A"} • Assigned: {q.doctor ? `Dr. ${q.doctor.first_name} ${q.doctor.last_name}` : "Not Assigned"}
+                  </p>
                 </div>
                 <span className={`px-2 py-0.5 rounded text-3xs font-extrabold uppercase border ${
                   q.status === "PENDING"

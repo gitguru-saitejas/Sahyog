@@ -485,21 +485,143 @@ class HospitalService:
     # CONSULTATION & PRESCRIPTIONS (DOCTOR)
     # ---------------------------------------------------------
     def get_doctor_dashboard(self, hospital_id: str, doctor_id: str) -> dict:
-        today_start = datetime.combine(datetime.today(), datetime.min.time())
+        from sqlalchemy import or_
+        time_threshold = datetime.now(timezone.utc) - timedelta(hours=24)
         encounters = self.db.query(Encounter).filter(
             Encounter.hospital_id == hospital_id,
-            Encounter.doctor_id == doctor_id,
-            Encounter.created_at >= today_start
+            or_(
+                Encounter.doctor_id == doctor_id,
+                Encounter.doctor_id == None
+            ),
+            or_(
+                Encounter.status == "PENDING",
+                Encounter.created_at >= time_threshold
+            )
         ).all()
 
         pending = [e for e in encounters if e.status == "PENDING"]
         completed = [e for e in encounters if e.status == "COMPLETED"]
 
+        serialized_encounters = []
+        for e in encounters:
+            patient_info = {
+                "id": str(e.patient.id),
+                "patient_code": e.patient.patient_code,
+                "first_name": e.patient.first_name,
+                "last_name": e.patient.last_name,
+                "date_of_birth": e.patient.date_of_birth.isoformat() if e.patient.date_of_birth else None,
+                "gender": e.patient.gender
+            } if e.patient else None
+
+            serialized_encounters.append({
+                "id": str(e.id),
+                "patient_id": str(e.patient_id),
+                "hospital_id": str(e.hospital_id),
+                "staff_id": str(e.staff_id) if e.staff_id else None,
+                "doctor_id": str(e.doctor_id) if e.doctor_id else None,
+                "status": e.status,
+                "height": e.height,
+                "weight": e.weight,
+                "bmi": e.bmi,
+                "temperature": e.temperature,
+                "blood_pressure": e.blood_pressure,
+                "pulse_rate": e.pulse_rate,
+                "respiratory_rate": e.respiratory_rate,
+                "spo2": e.spo2,
+                "chief_complaint": e.chief_complaint,
+                "symptoms": e.symptoms,
+                "symptoms_duration": e.symptoms_duration,
+                "clinical_notes": e.clinical_notes,
+                "blood_group": e.blood_group,
+                "blood_sugar": e.blood_sugar,
+                "cbc": e.cbc,
+                "urine_test": e.urine_test,
+                "ecg": e.ecg,
+                "other_labs": e.other_labs,
+                "uploaded_files": e.uploaded_files,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+                "updated_at": e.updated_at.isoformat() if e.updated_at else None,
+                "patient": patient_info
+            })
+
         return {
             "total_today": len(encounters),
             "pending_count": len(pending),
             "completed_count": len(completed),
-            "encounters": encounters
+            "encounters": serialized_encounters
+        }
+
+    def get_staff_dashboard(self, hospital_id: str) -> dict:
+        from sqlalchemy import or_
+        time_threshold = datetime.now(timezone.utc) - timedelta(hours=24)
+        encounters = self.db.query(Encounter).filter(
+            Encounter.hospital_id == hospital_id,
+            or_(
+                Encounter.status == "PENDING",
+                Encounter.created_at >= time_threshold
+            )
+        ).all()
+
+        pending = [e for e in encounters if e.status == "PENDING"]
+        completed = [e for e in encounters if e.status == "COMPLETED"]
+
+        serialized_encounters = []
+        for e in encounters:
+            patient_info = {
+                "id": str(e.patient.id),
+                "patient_code": e.patient.patient_code,
+                "first_name": e.patient.first_name,
+                "last_name": e.patient.last_name,
+                "date_of_birth": e.patient.date_of_birth.isoformat() if e.patient.date_of_birth else None,
+                "gender": e.patient.gender
+            } if e.patient else None
+
+            doctor_info = None
+            if e.doctor:
+                doctor_info = {
+                    "id": str(e.doctor.id),
+                    "first_name": e.doctor.first_name,
+                    "last_name": e.doctor.last_name,
+                    "specialization": e.doctor.specialization if hasattr(e.doctor, "specialization") else ""
+                }
+
+            serialized_encounters.append({
+                "id": str(e.id),
+                "patient_id": str(e.patient_id),
+                "hospital_id": str(e.hospital_id),
+                "staff_id": str(e.staff_id) if e.staff_id else None,
+                "doctor_id": str(e.doctor_id) if e.doctor_id else None,
+                "status": e.status,
+                "height": e.height,
+                "weight": e.weight,
+                "bmi": e.bmi,
+                "temperature": e.temperature,
+                "blood_pressure": e.blood_pressure,
+                "pulse_rate": e.pulse_rate,
+                "respiratory_rate": e.respiratory_rate,
+                "spo2": e.spo2,
+                "chief_complaint": e.chief_complaint,
+                "symptoms": e.symptoms,
+                "symptoms_duration": e.symptoms_duration,
+                "clinical_notes": e.clinical_notes,
+                "blood_group": e.blood_group,
+                "blood_sugar": e.blood_sugar,
+                "cbc": e.cbc,
+                "urine_test": e.urine_test,
+                "ecg": e.ecg,
+                "other_labs": e.other_labs,
+                "uploaded_files": e.uploaded_files,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+                "updated_at": e.updated_at.isoformat() if e.updated_at else None,
+                "patient": patient_info,
+                "doctor": doctor_info
+            })
+
+        return {
+            "total_today": len(encounters),
+            "pending_count": len(pending),
+            "completed_count": len(completed),
+            "encounters": serialized_encounters
         }
 
     def complete_consultation(self, hospital_id: str, encounter_id: str, doctor_id: str, data: dict, ip_address: Optional[str] = None) -> Encounter:

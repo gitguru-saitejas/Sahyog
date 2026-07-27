@@ -215,6 +215,7 @@ class TimelineService:
                 status=enc.status,
                 primary_diagnosis=primary_diag,
                 chief_complaint=enc.chief_complaint or "",
+                clinical_notes=enc.clinical_notes or "",
                 sub_events=sub_events,
                 vitals_summary=vitals_dict,
                 prescriptions=rx_list,

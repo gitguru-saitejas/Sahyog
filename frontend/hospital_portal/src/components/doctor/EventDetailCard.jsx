@@ -118,6 +118,30 @@ export default function EventDetailCard({ encounter, loading }) {
         </div>
       )}
 
+      {/* Diagnosis & Clinical Findings */}
+      {(encounter.primary_diagnosis || encounter.clinical_notes) && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <CheckCircle2 className="h-4 w-4 text-blue-500" />
+            Diagnosis & Clinical Findings
+          </h3>
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 text-xs leading-relaxed space-y-2.5">
+            {encounter.primary_diagnosis && (
+              <div>
+                <span className="block text-3xs font-extrabold text-slate-400 uppercase tracking-wider mb-0.5">Primary Diagnosis</span>
+                <strong className="text-slate-800 dark:text-slate-100 font-bold">{encounter.primary_diagnosis}</strong>
+              </div>
+            )}
+            {encounter.clinical_notes && (
+              <div className="border-t border-slate-200/50 dark:border-slate-850 pt-2">
+                <span className="block text-3xs font-extrabold text-slate-400 uppercase tracking-wider mb-0.5">Clinical Notes</span>
+                <p className="text-slate-700 dark:text-slate-300 font-medium">{encounter.clinical_notes}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Prescriptions Table */}
       {encounter.prescriptions && encounter.prescriptions.length > 0 && (
         <div className="space-y-2.5">

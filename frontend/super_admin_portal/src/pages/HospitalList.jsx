@@ -130,7 +130,7 @@ export default function HospitalList() {
       await api.delete(`/hospitals/${actionHospitalId}`);
       fetchHospitals();
     } catch (err) {
-      // Axios interceptor will display toast
+      alert("Unable to delete record. Please try again.");
     }
   };
 
@@ -529,14 +529,14 @@ export default function HospitalList() {
         </div>
       )}
 
-      {/* Confirm Soft Delete */}
+      {/* Confirm Hard Delete */}
       <ConfirmDialog
         isOpen={confirmDeleteOpen}
         onClose={() => setConfirmDeleteOpen(false)}
         onConfirm={executeDelete}
-        title="Soft Delete Hospital?"
-        message="Are you sure you want to deactivate and soft-delete this hospital? Medical services and staffing linked to this node will remain intact, but the portal access will be flagged inactive."
-        confirmText="Soft Delete"
+        title="Delete Hospital?"
+        message="This action cannot be undone."
+        confirmText="Delete"
       />
 
       {/* Confirm Restore */}

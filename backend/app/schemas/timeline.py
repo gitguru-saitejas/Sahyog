@@ -40,6 +40,7 @@ class EncounterTimelineCard(BaseModel):
     status: str
     primary_diagnosis: Optional[str] = "General Consultation"
     chief_complaint: Optional[str] = ""
+    clinical_notes: Optional[str] = ""
     sub_events: List[SubEvent] = []
     vitals_summary: Optional[Dict[str, Any]] = {}
     prescriptions: List[Dict[str, Any]] = []

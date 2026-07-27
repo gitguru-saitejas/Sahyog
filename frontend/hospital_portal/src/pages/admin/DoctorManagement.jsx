@@ -72,13 +72,13 @@ export default function DoctorManagement() {
   };
 
   const deleteDoc = async (id) => {
-    if (!confirm("Are you sure you want to soft-delete this doctor?")) return;
+    if (!confirm("Delete Doctor?\nThis action cannot be undone.")) return;
     try {
       await api.delete(`/patients/hospital/admin/doctors/${id}`);
-      showToast("success", "Doctor soft-deleted successfully.");
+      showToast("success", "Doctor permanently deleted successfully.");
       loadDoctorsData();
     } catch (err) {
-      showToast("error", "Failed to delete doctor.");
+      showToast("error", "Unable to delete record. Please try again.");
     }
   };
 
