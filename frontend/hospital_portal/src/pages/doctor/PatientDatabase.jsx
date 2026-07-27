@@ -1,7 +1,8 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
-import { Search, User, FileText } from "lucide-react";
+import { Search, User, FileText, Activity } from "lucide-react";
 
 export default function PatientDatabase() {
   const { showToast } = useAuth();
@@ -14,7 +15,7 @@ export default function PatientDatabase() {
     if (!searchQuery.trim()) return;
     setLoading(true);
     try {
-      const res = await api.get(`/patients/hospital/staff/search?query=${searchQuery}`);
+      const res = await api.get(`/patients/hospital/doctor/search?query=${searchQuery}`);
       setPatients(res.data);
       if (res.data.length === 0) {
         showToast("info", "No patients found matching query.");
@@ -69,9 +70,18 @@ export default function PatientDatabase() {
                     <p className="text-3xs text-slate-400 font-bold uppercase tracking-wider">Patient Code: {pat.patient_code} • Aadhaar Last 4: {pat.aadhaar_last4}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-3xs font-extrabold uppercase text-slate-400 block mb-0.5">Blood Group</span>
-                  <span className="font-bold">{pat.blood_group || "—"}</span>
+                <div className="flex items-center gap-4">
+                  <div className="text-right hidden sm:block">
+                    <span className="text-3xs font-extrabold uppercase text-slate-400 block mb-0.5">Blood Group</span>
+                    <span className="font-bold">{pat.blood_group || "—"}</span>
+                  </div>
+                  <Link
+                    to={`/doctor/timeline?patient_code=${pat.patient_code}`}
+                    className="flex items-center gap-1 py-1.5 px-3 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-600 dark:text-blue-400 font-bold text-xs rounded-xl border border-blue-200 dark:border-blue-800/60 transition cursor-pointer"
+                  >
+                    <Activity className="h-3.5 w-3.5" />
+                    View Timeline
+                  </Link>
                 </div>
               </div>
             ))}

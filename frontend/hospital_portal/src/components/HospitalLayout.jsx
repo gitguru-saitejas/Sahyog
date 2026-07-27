@@ -34,6 +34,7 @@ export default function HospitalLayout({ children }) {
       case "DOCTOR":
         return [
           { label: "Dashboard", path: "/doctor/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
+          { label: "Patient Timeline", path: "/doctor/timeline", icon: <Activity className="h-5 w-5" /> },
           { label: "Patient Database", path: "/doctor/patients", icon: <Search className="h-5 w-5" /> }
         ];
       case "SUPPORT_STAFF":

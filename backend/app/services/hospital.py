@@ -544,6 +544,9 @@ class HospitalService:
             self.db.commit()
             self.db.refresh(encounter)
 
+            from app.services.ai_summarizer import invalidate_patient_summary_cache
+            invalidate_patient_summary_cache(str(encounter.patient_id))
+
             self.repo.create_audit_log(
                 hospital_id=hospital_id,
                 user_id=doctor_id,

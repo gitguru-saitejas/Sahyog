@@ -31,3 +31,4 @@ venv/
 # Local databases
 *.db
 
+scratch_test.py

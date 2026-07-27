@@ -222,11 +222,12 @@ class Prescription(Base):
     __tablename__ = "prescriptions"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=generate_uuid)
-    encounter_id = Column(UUID(as_uuid=False), ForeignKey("encounters.id", ondelete="CASCADE"), nullable=False)
+    encounter_id = Column(UUID(as_uuid=False), ForeignKey("encounters.id", ondelete="CASCADE"), nullable=True)
     patient_id = Column(UUID(as_uuid=False), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
     doctor_id = Column(UUID(as_uuid=False), ForeignKey("hospital_users.id", ondelete="CASCADE"), nullable=False)
     diagnosis = Column(String(1000), nullable=True)
     notes = Column(String(2000), nullable=True)
+    issued_date = Column(Date, nullable=True, default=lambda: datetime.now(timezone.utc).date())
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     encounter = orm_relationship("Encounter", back_populates="prescription")
