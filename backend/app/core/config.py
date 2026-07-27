@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "rag-documents"
 
+    # Gemini API Key
+    GEMINI_API_KEY: str = ""
+
     # CORS Allowed origins
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",

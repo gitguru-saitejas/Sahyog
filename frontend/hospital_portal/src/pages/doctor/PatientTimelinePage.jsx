@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import PatientHeader from "../../components/doctor/PatientHeader";
 import TimelineList from "../../components/doctor/TimelineList";
 import EventDetailCard from "../../components/doctor/EventDetailCard";
-import AISummaryPanel from "../../components/doctor/AISummaryPanel";
+import SummarizePanel from "../../components/summarize/SummarizePanel";
 import { Search, Stethoscope, ArrowLeft, RefreshCcw } from "lucide-react";
 
 export default function PatientTimelinePage() {
@@ -181,16 +181,9 @@ export default function PatientTimelinePage() {
           />
         </div>
 
-        {/* Right Panel: AI Medical Assistant (3 Cols) */}
+        {/* Right Panel: AI Clinical Summarization Agent (3 Cols) */}
         <div className="lg:col-span-3 space-y-4">
-          <AISummaryPanel
-            overallSummary={overallSummary}
-            eventSummary={eventSummary}
-            selectedEncounter={selectedEncounter}
-            onRefreshSummary={() => header && fetchOverallSummary(header.patient_id, true)}
-            loadingOverall={loadingOverallSummary}
-            loadingEvent={loadingEventSummary}
-          />
+          {header && <SummarizePanel patientId={header.patient_id} />}
         </div>
 
       </div>

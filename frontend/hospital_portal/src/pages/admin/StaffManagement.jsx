@@ -72,13 +72,13 @@ export default function StaffManagement() {
   };
 
   const deleteStaff = async (id) => {
-    if (!confirm("Are you sure you want to soft-delete this support staff member?")) return;
+    if (!confirm("Delete Support Staff?\nThis action cannot be undone.")) return;
     try {
       await api.delete(`/patients/hospital/admin/staff/${id}`);
-      showToast("success", "Support staff member soft-deleted successfully.");
+      showToast("success", "Support staff member permanently deleted successfully.");
       loadStaffData();
     } catch (err) {
-      showToast("error", "Failed to delete employee profile.");
+      showToast("error", "Unable to delete record. Please try again.");
     }
   };
 

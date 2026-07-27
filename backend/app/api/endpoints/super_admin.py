@@ -443,41 +443,11 @@ def delete_hospital(
             detail="Hospital not found."
         )
 
-    if h.deleted_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Hospital is already soft-deleted."
-        )
-
-    h.deleted_at = datetime.now(timezone.utc)
-
-    # Cascade soft-deactivate all hospital employees (admins, doctors, staff)
-    from app.models.patient import HospitalUser
-    employees = db.query(HospitalUser).filter(
-        HospitalUser.hospital_id == str(hospital_id),
-        HospitalUser.deleted_at == None
-    ).all()
-    for emp in employees:
-        emp.status = "INACTIVE"
-        emp.deleted_at = datetime.now(timezone.utc)
-
-    db.commit()
-    db.refresh(h)
-
-    # Auditing
-    log_audit(
-        db=db,
-        user_id=current_admin.id,
-        action="DELETE",
-        table_name="hospitals",
-        record_id=h.id,
-        old_values={"deleted_at": None},
-        new_values={"deleted_at": str(h.deleted_at)}
-    )
-
+    # 1. Fetch dependencies for response before deleting
     doc_count = db.query(Doctor).filter(Doctor.hospital_id == h.id, Doctor.deleted_at == None).count()
     deps = db.query(Department).filter(Department.hospital_id == h.id, Department.deleted_at == None).all()
     h_admins = db.query(HospitalAdmin).filter(HospitalAdmin.hospital_id == h.id).all()
+    
     assigned_admins = []
     for ha in h_admins:
         u = db.query(User).filter(User.id == ha.user_id).first()
@@ -490,7 +460,8 @@ def delete_hospital(
                 email=u.email
             ))
 
-    return HospitalDetailResponse(
+    # 2. Build the final response details before the DB row is removed
+    response_detail = HospitalDetailResponse(
         id=h.id,
         name=h.name,
         address=h.address,
@@ -504,6 +475,23 @@ def delete_hospital(
         departments=[DepartmentResponse(id=d.id, name=d.name, description=d.description, created_at=d.created_at) for d in deps],
         assigned_admins=assigned_admins
     )
+
+    # 3. Log audit
+    log_audit(
+        db=db,
+        user_id=current_admin.id,
+        action="DELETE",
+        table_name="hospitals",
+        record_id=h.id,
+        old_values={"deleted_at": None},
+        new_values={"deleted_at": str(datetime.now(timezone.utc))}
+    )
+
+    # 4. Perform hard delete from database
+    db.delete(h)
+    db.commit()
+
+    return response_detail
 
 @router.patch("/hospitals/{hospital_id}/restore", response_model=HospitalDetailResponse)
 def restore_hospital(

@@ -294,10 +294,18 @@ def get_admin_dashboard(
 # ---------------------------
 # HOSPITAL SUPPORT STAFF APIS
 # ---------------------------
+@router.get("/hospital/staff/dashboard", tags=["hospital-staff"])
+def get_staff_dashboard(
+    current_user: HospitalUser = Depends(require_hospital_user),
+    db: Session = Depends(get_db)
+):
+    service = HospitalService(db)
+    return service.get_staff_dashboard(str(current_user.hospital_id))
+
 @router.get("/hospital/staff/search", response_model=List[PatientResponse], tags=["hospital-staff"])
 def staff_search_patients(
     query: str,
-    current_staff: HospitalUser = Depends(require_support_staff),
+    current_user: HospitalUser = Depends(require_hospital_user),
     db: Session = Depends(get_db)
 ):
     service = HospitalService(db)
@@ -308,7 +316,7 @@ def create_or_update_encounter(
     req: EncounterCreate,
     request: Request,
     encounter_id: Optional[str] = None,
-    current_staff: HospitalUser = Depends(require_support_staff),
+    current_user: HospitalUser = Depends(require_hospital_user),
     db: Session = Depends(get_db)
 ):
     ip_address = request.client.host if request.client else None
@@ -316,17 +324,17 @@ def create_or_update_encounter(
     data = req.model_dump(exclude_unset=True)
     if encounter_id:
         data["encounter_id"] = encounter_id
-    encounter = service.create_or_update_encounter(str(current_staff.hospital_id), str(current_staff.id), data, ip_address)
+    encounter = service.create_or_update_encounter(str(current_user.hospital_id), str(current_user.id), data, ip_address)
     return encounter
 
 @router.get("/hospital/staff/doctors", response_model=List[DoctorResponse], tags=["hospital-staff"])
 def staff_list_doctors(
-    current_staff: HospitalUser = Depends(require_support_staff),
+    current_user: HospitalUser = Depends(require_hospital_user),
     db: Session = Depends(get_db)
 ):
-    """Allows support staff to list active doctors in their hospital for triage assignment."""
+    """Allows support staff and doctors to list active doctors in their hospital for triage assignment."""
     service = HospitalService(db)
-    return service.repo.get_employees_by_role(str(current_staff.hospital_id), "DOCTOR")
+    return service.repo.get_employees_by_role(str(current_user.hospital_id), "DOCTOR")
 
 
 # ---------------------------
@@ -334,16 +342,16 @@ def staff_list_doctors(
 # ---------------------------
 @router.get("/hospital/doctor/dashboard", tags=["hospital-doctor"])
 def get_doctor_dashboard(
-    current_doctor: HospitalUser = Depends(require_doctor),
+    current_user: HospitalUser = Depends(require_hospital_user),
     db: Session = Depends(get_db)
 ):
     service = HospitalService(db)
-    return service.get_doctor_dashboard(str(current_doctor.hospital_id), str(current_doctor.id))
+    return service.get_doctor_dashboard(str(current_user.hospital_id), str(current_user.id))
 
 @router.get("/hospital/doctor/search", response_model=List[PatientResponse], tags=["hospital-doctor"])
 def doctor_search_patients(
     query: str,
-    current_doctor: HospitalUser = Depends(require_doctor),
+    current_user: HospitalUser = Depends(require_hospital_user),
     db: Session = Depends(get_db)
 ):
     service = HospitalService(db)
@@ -352,12 +360,12 @@ def doctor_search_patients(
 @router.get("/hospital/doctor/patients/{patient_id}/timeline", response_model=List[EncounterResponse], tags=["hospital-doctor"])
 def get_patient_timeline(
     patient_id: str,
-    current_doctor: HospitalUser = Depends(require_doctor),
+    current_user: HospitalUser = Depends(require_hospital_user),
     db: Session = Depends(get_db)
 ):
     service = HospitalService(db)
     # Ensure isolation - only list encounters for this hospital
-    return service.repo.get_encounters(str(current_doctor.hospital_id), patient_id=patient_id)
+    return service.repo.get_encounters(str(current_user.hospital_id), patient_id=patient_id)
 
 @router.post("/hospital/doctor/encounters/{encounter_id}/complete", response_model=EncounterResponse, tags=["hospital-doctor"])
 def complete_consultation(
@@ -374,12 +382,12 @@ def complete_consultation(
 @router.get("/hospital/doctor/encounters/{encounter_id}", response_model=EncounterResponse, tags=["hospital-doctor"])
 def get_encounter_detail(
     encounter_id: str,
-    current_doctor: HospitalUser = Depends(require_doctor),
+    current_user: HospitalUser = Depends(require_hospital_user),
     db: Session = Depends(get_db)
 ):
     """Returns the full encounter record (all vitals + clinical notes entered by support staff)."""
     service = HospitalService(db)
-    enc = service.repo.get_encounter(str(current_doctor.hospital_id), encounter_id)
+    enc = service.repo.get_encounter(str(current_user.hospital_id), encounter_id)
     if not enc:
         raise HTTPException(status_code=404, detail="Encounter not found.")
     return enc
