@@ -17,7 +17,6 @@ import DepartmentManagement from "./pages/admin/DepartmentManagement";
 
 // Doctor Pages
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
-import PatientDatabase from "./pages/doctor/PatientDatabase";
 import PatientTimelinePage from "./pages/doctor/PatientTimelinePage";
 
 // Support Staff Pages
@@ -74,14 +73,7 @@ const App = () => {
               </DoctorRoute>
             }
           />
-          <Route
-            path="/doctor/patients"
-            element={
-              <DoctorRoute>
-                <PatientDatabase />
-              </DoctorRoute>
-            }
-          />
+
 
           {/* Support Staff routes */}
           <Route

@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5174, // Unique port for super admin portal to prevent collisions
-    host: true
+    host: true,
+    strictPort: true
   }
 })

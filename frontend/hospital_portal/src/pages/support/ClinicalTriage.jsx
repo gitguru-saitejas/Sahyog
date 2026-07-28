@@ -2,7 +2,50 @@ import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { useForm } from "react-hook-form";
-import { Search, User, ClipboardList } from "lucide-react";
+import {
+  Search, User, ClipboardList, X, Stethoscope, Thermometer,
+  Heart, Wind, Activity, Droplet, CheckCircle
+} from "lucide-react";
+import { Card } from "../../components/ui/Card";
+import { Avatar } from "../../components/ui/Avatar";
+import { Badge } from "../../components/ui/Badge";
+
+// ─── Shared input class ────────────────────────────────────────────────────
+const inputCls =
+  "w-full px-3.5 py-2.5 bg-[#F8FAFC] dark:bg-slate-950 border border-[#E5E7EB] dark:border-slate-800 text-xs font-semibold rounded-xl focus:ring-2 focus:ring-[#50ABE7]/20 focus:border-[#50ABE7] focus:outline-none transition dark:text-slate-50 placeholder:text-[#94A3B8]";
+
+// ─── Section card with title ───────────────────────────────────────────────
+function SectionCard({ icon: Icon, title, children, className = "" }) {
+  return (
+    <Card className={`p-5 space-y-4 ${className}`}>
+      <div className="flex items-center gap-2 border-b border-[#E5E7EB] dark:border-slate-800 pb-3">
+        <Icon className="h-4 w-4 text-[#50ABE7]" />
+        <h3 className="font-bold text-xs text-[#1E293B] dark:text-slate-100 uppercase tracking-wide">
+          {title}
+        </h3>
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+// ─── Vital input field ────────────────────────────────────────────────────
+function VitalField({ label, placeholder, register: reg, name, type = "text", step }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] dark:text-slate-400 block">
+        {label}
+      </label>
+      <input
+        type={type}
+        step={step}
+        placeholder={placeholder}
+        className={inputCls}
+        {...reg(name)}
+      />
+    </div>
+  );
+}
 
 export default function ClinicalTriage() {
   const { showToast } = useAuth();
@@ -14,26 +57,12 @@ export default function ClinicalTriage() {
 
   const { register, handleSubmit, setValue, watch, reset } = useForm({
     defaultValues: {
-      height: "",
-      weight: "",
-      bmi: "",
-      temperature: "",
-      blood_pressure: "",
-      pulse_rate: "",
-      respiratory_rate: "",
-      spo2: "",
-      chief_complaint: "",
-      symptoms: "",
-      symptoms_duration: "",
-      clinical_notes: "",
-      blood_group: "",
-      blood_sugar: "",
-      cbc: "",
-      urine_test: "",
-      ecg: "",
-      other_labs: "",
-      uploaded_files: "",
-      doctor_id: ""
+      height: "", weight: "", bmi: "", temperature: "",
+      blood_pressure: "", pulse_rate: "", respiratory_rate: "", spo2: "",
+      chief_complaint: "", symptoms: "", symptoms_duration: "",
+      clinical_notes: "", blood_group: "", blood_sugar: "",
+      cbc: "", urine_test: "", ecg: "", other_labs: "",
+      uploaded_files: "", doctor_id: ""
     }
   });
 
@@ -45,15 +74,13 @@ export default function ClinicalTriage() {
       const hMeters = parseFloat(heightVal) / 100;
       const wKg = parseFloat(weightVal);
       if (hMeters > 0 && wKg > 0) {
-        const bmi = (wKg / (hMeters * hMeters)).toFixed(1);
-        setValue("bmi", bmi);
+        setValue("bmi", (wKg / (hMeters * hMeters)).toFixed(1));
       }
     }
   }, [heightVal, weightVal, setValue]);
 
   const loadDoctors = async () => {
     try {
-      // Use the staff-accessible endpoint (not the admin-only one)
       const docRes = await api.get("/patients/hospital/staff/doctors");
       setDoctors(docRes.data);
     } catch (err) {
@@ -61,9 +88,7 @@ export default function ClinicalTriage() {
     }
   };
 
-  useEffect(() => {
-    loadDoctors();
-  }, []);
+  useEffect(() => { loadDoctors(); }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -108,7 +133,6 @@ export default function ClinicalTriage() {
         other_labs: data.other_labs || null,
         uploaded_files: data.uploaded_files || null
       };
-
       await api.post("/patients/hospital/staff/encounters", payload);
       showToast("success", "Clinical triage recorded successfully!");
       setSelectedPatient(null);
@@ -119,51 +143,60 @@ export default function ClinicalTriage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      
+    <div className="space-y-6 max-w-5xl mx-auto font-sans">
+
+      {/* Page header */}
       <div>
-        <h1 className="text-xl font-bold tracking-tight">Pre-Consultation Clinical Entry</h1>
-        <p className="text-xs text-slate-500">Search patient, log vital statistics, and prepare clinical triage details</p>
+        <h1 className="text-2xl font-bold tracking-tight text-[#1E293B] dark:text-slate-50 flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-[#50ABE7]" />
+          Pre-Consultation Clinical Entry
+        </h1>
+        <p className="text-xs text-[#64748B] dark:text-slate-400 mt-0.5">
+          Search patient record, log vital statistics, and prepare triage details
+        </p>
       </div>
 
-      <section className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-850 p-5 rounded-2xl shadow-sm space-y-4">
-        <h3 className="font-bold text-xs flex items-center gap-2 text-slate-800 dark:text-slate-100">
-          <Search className="h-4.5 w-4.5 text-blue-600" />
-          Find Patient Record
-        </h3>
+      {/* ── Patient search ─────────────────────────────────────────────────── */}
+      <SectionCard icon={Search} title="Find Patient Record">
         <form onSubmit={handleSearch} className="flex gap-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by Patient ID, Name, Mobile, or Aadhaar..."
-            className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-955 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition dark:text-slate-550"
-          />
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-2.5 h-3.5 w-3.5 text-[#94A3B8]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by Patient ID, Name, Mobile, or Aadhaar..."
+              className="w-full pl-9 pr-4 py-2.5 bg-[#F8FAFC] dark:bg-slate-950 border border-[#E5E7EB] dark:border-slate-800 text-xs font-semibold rounded-xl focus:ring-2 focus:ring-[#50ABE7]/20 focus:border-[#50ABE7] focus:outline-none transition dark:text-slate-50 placeholder:text-[#94A3B8]"
+            />
+          </div>
           <button
             type="submit"
             disabled={loading}
-            className="py-2 px-5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm cursor-pointer active:scale-98 transition"
+            className="py-2.5 px-5 bg-[#50ABE7] hover:bg-[#3ea0df] text-white font-bold text-xs rounded-xl shadow-md shadow-[#50ABE7]/20 cursor-pointer active:scale-98 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? "Searching..." : "Search"}
           </button>
         </form>
 
+        {/* Search results */}
         {patients.length > 0 && (
-          <div className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold">
+          <div className="border border-[#E5E7EB] dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-[#E5E7EB] dark:divide-slate-800">
             {patients.map((pat, idx) => (
-              <div key={idx} className="p-3.5 flex items-center justify-between gap-4 bg-slate-50/20 dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-850">
+              <div key={idx} className="p-3.5 flex items-center justify-between gap-4 hover:bg-[#F8FAFC] dark:hover:bg-slate-900 transition">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-955 dark:text-blue-400 flex items-center justify-center font-bold">
-                    {pat.first_name[0]}
-                  </div>
+                  <Avatar name={`${pat.first_name} ${pat.last_name}`} size="sm" />
                   <div>
-                    <h4 className="font-bold text-slate-855 dark:text-slate-50">{pat.first_name} {pat.last_name}</h4>
-                    <p className="text-3xs text-slate-400 font-bold uppercase tracking-wider">Patient Code: {pat.patient_code} • Aadhaar Last 4: {pat.aadhaar_last4}</p>
+                    <p className="font-bold text-xs text-[#1E293B] dark:text-slate-100">
+                      {pat.first_name} {pat.last_name}
+                    </p>
+                    <p className="text-[10px] text-[#94A3B8] font-semibold mt-0.5 uppercase tracking-wide">
+                      Code: {pat.patient_code} · Aadhaar Last 4: {pat.aadhaar_last4}
+                    </p>
                   </div>
                 </div>
                 <button
                   onClick={() => { setSelectedPatient(pat); setPatients([]); }}
-                  className="py-1 px-3 bg-blue-50 hover:bg-blue-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-blue-600 dark:text-blue-450 font-bold text-2xs rounded-lg transition cursor-pointer"
+                  className="py-1.5 px-4 bg-[#EDF7FF] hover:bg-[#D0EEFF] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#50ABE7] font-bold text-xs rounded-lg transition cursor-pointer"
                 >
                   Select
                 </button>
@@ -171,114 +204,149 @@ export default function ClinicalTriage() {
             ))}
           </div>
         )}
-      </section>
+      </SectionCard>
 
+      {/* ── Triage form (shown when a patient is selected) ─────────────────── */}
       {selectedPatient && (
         <form onSubmit={handleSubmit(onEncounterSubmit)} className="space-y-6">
-          
-          <div className="p-4 bg-blue-50/30 dark:bg-slate-900 border border-blue-150/40 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <User className="h-5 w-5 text-blue-600 shrink-0" />
-              <div className="text-xs">
-                <h4 className="font-bold text-slate-855 dark:text-slate-50">Triage Profile: {selectedPatient.first_name} {selectedPatient.last_name}</h4>
-                <p className="text-3xs text-slate-400 font-semibold">Blood Group: {selectedPatient.blood_group || "—"} • Gender: {selectedPatient.gender || "—"}</p>
-              </div>
-            </div>
-            <button 
-              type="button" 
-              onClick={() => setSelectedPatient(null)}
-              className="text-slate-455 hover:text-red-500 font-bold text-xs"
-            >
-              Clear
-            </button>
-          </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-850 p-6 rounded-3xl shadow-sm space-y-4">
-            <h3 className="font-bold text-xs text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-2">
-              Patient Vital Signs (All Fields Optional)
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-semibold">
-              <div className="space-y-1">
-                <label>Height (cm)</label>
-                <input type="number" step="0.1" placeholder="e.g. 175" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("height")} />
-              </div>
-              <div className="space-y-1">
-                <label>Weight (kg)</label>
-                <input type="number" step="0.1" placeholder="e.g. 70" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("weight")} />
-              </div>
-              <div className="space-y-1">
-                <label>BMI (Auto)</label>
-                <input disabled type="text" placeholder="—" className="w-full border p-2 bg-slate-100 dark:bg-slate-900 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("bmi")} />
-              </div>
-              <div className="space-y-1">
-                <label>Temperature (°C)</label>
-                <input type="number" step="0.1" placeholder="e.g. 36.8" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("temperature")} />
-              </div>
-              <div className="space-y-1">
-                <label>Blood Pressure (BP)</label>
-                <input type="text" placeholder="e.g. 120/80" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("blood_pressure")} />
-              </div>
-              <div className="space-y-1">
-                <label>Pulse Rate (bpm)</label>
-                <input type="number" placeholder="e.g. 72" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("pulse_rate")} />
-              </div>
-              <div className="space-y-1">
-                <label>Resp Rate (rpm)</label>
-                <input type="number" placeholder="e.g. 16" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("respiratory_rate")} />
-              </div>
-              <div className="space-y-1">
-                <label>Oxygen Saturation (SpO₂)</label>
-                <input type="number" placeholder="e.g. 98" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("spo2")} />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-850 p-6 rounded-3xl shadow-sm space-y-4">
-            <h3 className="font-bold text-xs text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-2">
-              Clinical Details & Diagnostics
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label>Chief Complaint</label>
-                  <textarea rows={2} placeholder="Primary reason for patient visit..." className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("chief_complaint")} />
-                </div>
-                <div className="space-y-1">
-                  <label>Symptoms & Duration</label>
-                  <input type="text" placeholder="e.g. Cough for 3 days" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("symptoms")} />
+          {/* Selected patient banner */}
+          <Card className="p-4 border-l-4 border-l-[#50ABE7]">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Avatar name={`${selectedPatient.first_name} ${selectedPatient.last_name}`} size="md" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm text-[#1E293B] dark:text-slate-100">
+                      {selectedPatient.first_name} {selectedPatient.last_name}
+                    </p>
+                    <Badge color="blue">Triage Active</Badge>
+                  </div>
+                  <p className="text-[10px] text-[#94A3B8] font-semibold mt-0.5">
+                    Blood Group: {selectedPatient.blood_group || "—"} · Gender: {selectedPatient.gender || "—"}
+                  </p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPatient(null)}
+                className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#EF4444] hover:bg-[#FEF2F2] transition cursor-pointer"
+                title="Clear selection"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </Card>
 
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label>Assign to Doctor</label>
-                  <select className="w-full border p-2.5 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50 font-bold" {...register("doctor_id")}>
+          {/* Vital Signs section */}
+          <SectionCard icon={Activity} title="Patient Vital Signs (All Fields Optional)">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <VitalField label="Height (cm)"         name="height"           placeholder="175"      type="number" step="0.1"  register={register} />
+              <VitalField label="Weight (kg)"         name="weight"           placeholder="70"       type="number" step="0.1"  register={register} />
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] dark:text-slate-400 block">
+                  BMI (Auto)
+                </label>
+                <input
+                  disabled
+                  type="text"
+                  placeholder="—"
+                  className="w-full px-3.5 py-2.5 bg-[#F1F5F9] dark:bg-slate-900 border border-[#E5E7EB] dark:border-slate-800 text-xs font-bold rounded-xl text-[#64748B] dark:text-slate-400 cursor-not-allowed"
+                  {...register("bmi")}
+                />
+              </div>
+              <VitalField label="Temperature (°C)"   name="temperature"      placeholder="36.8"     type="number" step="0.1"  register={register} />
+              <VitalField label="Blood Pressure"      name="blood_pressure"   placeholder="120/80"                             register={register} />
+              <VitalField label="Pulse Rate (bpm)"    name="pulse_rate"       placeholder="72"       type="number"             register={register} />
+              <VitalField label="Resp Rate (rpm)"     name="respiratory_rate" placeholder="16"       type="number"             register={register} />
+              <VitalField label="SpO₂ Saturation"     name="spo2"             placeholder="98"       type="number"             register={register} />
+            </div>
+          </SectionCard>
+
+          {/* Clinical Details section */}
+          <SectionCard icon={Stethoscope} title="Clinical Details & Assignment">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Left column */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] dark:text-slate-400 block">
+                    Chief Complaint
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Primary reason for patient visit..."
+                    className={inputCls + " resize-none"}
+                    {...register("chief_complaint")}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] dark:text-slate-400 block">
+                    Symptoms Description
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Cough for 3 days, mild fever"
+                    className={inputCls}
+                    {...register("symptoms")}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] dark:text-slate-400 block">
+                    Clinical Notes
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Additional clinical observations..."
+                    className={inputCls + " resize-none"}
+                    {...register("clinical_notes")}
+                  />
+                </div>
+              </div>
+
+              {/* Right column */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] dark:text-slate-400 block">
+                    Assign to Doctor
+                  </label>
+                  <select className={inputCls} {...register("doctor_id")}>
                     <option value="">Select Target Doctor</option>
                     {doctors.map((d, idx) => (
-                      <option key={idx} value={d.id}>Dr. {d.first_name} {d.last_name} ({d.specialization})</option>
+                      <option key={idx} value={d.id}>
+                        Dr. {d.first_name} {d.last_name} ({d.specialization})
+                      </option>
                     ))}
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label>Lab Investigations (Optional summaries)</label>
-                  <input type="text" placeholder="e.g. Glucose: 110 mg/dL" className="w-full border p-2 bg-slate-50 dark:bg-slate-955 dark:border-slate-800 rounded-lg dark:text-slate-50" {...register("blood_sugar")} />
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] dark:text-slate-400 block">
+                    Lab Investigations (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Glucose: 110 mg/dL, CBC: normal"
+                    className={inputCls}
+                    {...register("blood_sugar")}
+                  />
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
-          <div className="flex justify-end gap-3.5">
-            <button 
-              type="button" 
+          {/* Action buttons */}
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
               onClick={() => { setSelectedPatient(null); reset(); }}
-              className="py-2.5 px-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 font-bold text-xs rounded-xl hover:bg-slate-50 transition cursor-pointer"
+              className="py-2.5 px-5 bg-white dark:bg-slate-900 border border-[#E5E7EB] dark:border-slate-800 text-[#64748B] font-bold text-xs rounded-xl hover:bg-[#F1F5F9] transition cursor-pointer"
             >
               Reset Form
             </button>
-            <button 
-              type="submit" 
-              className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer active:scale-98 transition"
+            <button
+              type="submit"
+              className="flex items-center gap-2 py-2.5 px-6 bg-[#50ABE7] hover:bg-[#3ea0df] text-white font-bold text-xs rounded-xl shadow-md shadow-[#50ABE7]/20 cursor-pointer active:scale-98 transition"
             >
+              <CheckCircle className="h-4 w-4" />
               Save Triage Data
             </button>
           </div>

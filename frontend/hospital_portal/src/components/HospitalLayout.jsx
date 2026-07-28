@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { 
   Activity, Users, LayoutDashboard, Building, LogOut, Sun, Moon, 
-  Menu, X, ClipboardList, Stethoscope, Search
+  Menu, X, ClipboardList, Stethoscope
 } from "lucide-react";
 
 export default function HospitalLayout({ children }) {
@@ -34,8 +34,7 @@ export default function HospitalLayout({ children }) {
       case "DOCTOR":
         return [
           { label: "Dashboard", path: "/doctor/dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
-          { label: "Patient Timeline", path: "/doctor/timeline", icon: <Activity className="h-5 w-5" /> },
-          { label: "Patient Database", path: "/doctor/patients", icon: <Search className="h-5 w-5" /> }
+          { label: "Patient Timeline", path: "/doctor/timeline", icon: <Activity className="h-5 w-5" /> }
         ];
       case "SUPPORT_STAFF":
         return [

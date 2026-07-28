@@ -34,6 +34,9 @@ export default function App() {
 
   // Subscribe to API events for loading/toasts
   useEffect(() => {
+    // Force dark mode class on html root to load proper HSL CSS variable themes
+    document.documentElement.classList.add("dark");
+
     const unsubLoading = apiEvents.subscribe("loading", (state) => setLoading(state));
     const unsubToast = apiEvents.subscribe("toast", (t) => {
       setToast(t);
