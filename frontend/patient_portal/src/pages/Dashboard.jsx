@@ -68,6 +68,15 @@ export const Dashboard = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* AI Guidance */}
+          <button
+            onClick={() => navigate("/guidance")}
+            className="flex items-center gap-1.5 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 dark:bg-slate-800 dark:hover:bg-slate-750 text-emerald-600 dark:text-emerald-400 font-semibold text-xs rounded-xl transition duration-200 cursor-pointer shadow-sm"
+          >
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">AI Guidance</span>
+          </button>
+
           {/* Switch Profile */}
           <button
             onClick={handleSwitchProfile}
@@ -228,6 +237,27 @@ export const Dashboard = () => {
               </div>
 
             </div>
+          </section>
+
+          {/* AI Health Guidance Assistant Card */}
+          <section className="bg-emerald-50/10 dark:bg-emerald-950/5 border border-emerald-100/40 dark:border-emerald-900/20 rounded-3xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <Activity className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="block text-sm font-bold text-slate-800 dark:text-slate-200">AI Health Guidance Assistant</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 block leading-relaxed mt-0.5">
+                  Get grounded answers to wellness questions based on available Sahyog guidelines.
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate("/guidance")}
+              className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm cursor-pointer transition text-center shrink-0"
+            >
+              Ask Assistant
+            </button>
           </section>
 
           {/* Consents & Logs */}
