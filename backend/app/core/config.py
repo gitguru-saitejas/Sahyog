@@ -22,6 +22,21 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSIONS: int = 1024
     OLLAMA_API_URL: str = "http://localhost:11434"
 
+    # LLM Generation Configurations
+    LLM_PROVIDER: str = "ollama"
+    LLM_MODEL: str = "llama3.2:1b"
+    LLM_TIMEOUT: int = 30
+
+    # Gemini LLM Configuration
+    GEMINI_LLM_API_KEY: str = ""
+    GEMINI_LLM_MODEL: str = "gemini-2.5-flash"
+
+    # Gemini TTS Configuration
+    GEMINI_TTS_API_KEY: str = ""
+    GEMINI_TTS_MODEL: str = "gemini-2.5-flash-preview-tts"
+
+    FFMPEG_PATH: str = "ffmpeg"
+
     # CORS Allowed origins
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
@@ -37,3 +52,22 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 settings = Settings()
+
+ALLOWED_GUIDANCE_TOPICS = {
+    "PREGNANCY",
+    "DIABETES",
+    "HYPERTENSION",
+    "NUTRITION",
+    "CHILD_HEALTH",
+}
+
+def validate_guidance_topic(topic: str | None) -> str | None:
+    if topic is None:
+        return None
+    normalized = topic.strip().upper()
+    if normalized not in ALLOWED_GUIDANCE_TOPICS:
+        raise ValueError(
+            f"Invalid guidance topic. Must be one of {ALLOWED_GUIDANCE_TOPICS}"
+        )
+    return normalized
+

@@ -7,6 +7,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import OTPVerification from "./pages/OTPVerification";
 import FamilySelection from "./pages/FamilySelection";
 import Dashboard from "./pages/Dashboard";
+import PatientGuidanceAssistant from "./pages/PatientGuidanceAssistant";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 
 
@@ -121,6 +122,14 @@ export const App = () => {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/guidance"
+            element={
+              <ProtectedRoute>
+                <PatientGuidanceAssistant />
               </ProtectedRoute>
             }
           />

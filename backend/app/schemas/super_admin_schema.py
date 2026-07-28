@@ -97,6 +97,7 @@ class KnowledgeDocumentDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     chunk_count: int = 0
+    guidance_topic: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -110,3 +111,18 @@ class KnowledgeDocumentListResponse(BaseModel):
 
 class AssignAdminRequest(BaseModel):
     user_id: UUID
+
+
+class BulkUploadSuccessItem(BaseModel):
+    filename: str
+    document: KnowledgeDocumentDetailResponse
+
+
+class BulkUploadFailureItem(BaseModel):
+    filename: str
+    error: str
+
+
+class BulkUploadResponse(BaseModel):
+    successes: List[BulkUploadSuccessItem]
+    failures: List[BulkUploadFailureItem]

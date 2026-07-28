@@ -19,7 +19,7 @@ export const apiEvents = {
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000/api",
-  timeout: 10000,
+  timeout: 180000, // increased timeout to handle slower backend responses
   headers: {
     "Content-Type": "application/json",
   }
@@ -51,9 +51,42 @@ api.interceptors.response.use(
     apiEvents.emit("loading", false);
     return response;
   },
-  (error) => {
+  async (error) => {
     apiEvents.emit("loading", false);
-    const message = error.response?.data?.detail || error.response?.data?.message || error.message || "An unexpected error occurred.";
+    let message = "An unexpected error occurred.";
+    
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text();
+        const parsed = JSON.parse(text);
+        if (parsed?.detail) {
+          if (typeof parsed.detail === "string") {
+            message = parsed.detail;
+          } else if (Array.isArray(parsed.detail)) {
+            message = parsed.detail.map(d => `${d.loc ? d.loc.join('.') : 'Error'}: ${d.msg}`).join(', ');
+          } else {
+            message = JSON.stringify(parsed.detail);
+          }
+        } else if (parsed?.message) {
+          message = parsed.message;
+        }
+      } catch (e) {
+        // Fallback if parsing fails
+      }
+    } else if (error.response?.data?.detail) {
+      if (typeof error.response.data.detail === "string") {
+        message = error.response.data.detail;
+      } else if (Array.isArray(error.response.data.detail)) {
+        message = error.response.data.detail.map(d => `${d.loc ? d.loc.join('.') : 'Error'}: ${d.msg}`).join(', ');
+      } else {
+        message = JSON.stringify(error.response.data.detail);
+      }
+    } else if (error.response?.data?.message) {
+      message = error.response.data.message;
+    } else if (error.message) {
+      message = error.message;
+    }
+    
     apiEvents.emit("toast", { type: "error", message });
     return Promise.reject(error);
   }
@@ -473,13 +506,90 @@ const mockAdapter = async (url, data, method = "POST") => {
 
     return { data: { message: "Profile linked successfully.", patient: patients[pIdx] } };
   }
+  
+  if (url === "/patient-guidance/ask" && method === "POST") {
+    const { question, patient_id, hospital_id, session_id, guidance_topic } = data;
+    if (!question || !question.trim()) {
+      throw { response: { status: 400, data: { detail: "Question cannot be empty or only whitespace." } } };
+    }
+    if (question.length > 1000) {
+      throw { response: { status: 400, data: { detail: "Question exceeds maximum allowed length of 1000 characters." } } };
+    }
+
+    if (guidance_topic) {
+      const allowed = ["PREGNANCY", "DIABETES", "HYPERTENSION", "NUTRITION", "CHILD_HEALTH"];
+      const normalized = guidance_topic.trim().toUpperCase();
+      if (!allowed.includes(normalized)) {
+        throw { response: { status: 400, data: { detail: `Invalid guidance topic. Must be one of ${allowed.join(", ")}` } } };
+      }
+    }
+    
+    // Simulate zero-result fallback for a specific test query to test zero-context scenarios
+    if (question.toLowerCase().includes("blood group")) {
+      return {
+        data: {
+          answer: "I'm sorry, but I couldn't find any relevant patient guidance information in the knowledge base.",
+          sources: [],
+          session_id: session_id || `mock-session-${Date.now()}`
+        }
+      };
+    }
+
+    if (guidance_topic) {
+      const normalized = guidance_topic.trim().toUpperCase();
+      if (normalized === "PREGNANCY") {
+        return {
+          data: {
+            answer: "Mock Pregnancy guidance response.",
+            sources: [
+              { document_title: "Mock Pregnancy Guidance", similarity_score: 0.91 }
+            ],
+            session_id: session_id || `mock-session-pregnancy-${Date.now()}`
+          }
+        };
+      }
+      if (normalized === "DIABETES") {
+        return {
+          data: {
+            answer: "Mock Diabetes guidance response.",
+            sources: [
+              { document_title: "Mock Diabetes Guidance", similarity_score: 0.91 }
+            ],
+            session_id: session_id || `mock-session-diabetes-${Date.now()}`
+          }
+        };
+      }
+      if (normalized === "HYPERTENSION") {
+        return {
+          data: {
+            answer: "Mock Hypertension guidance response.",
+            sources: [
+              { document_title: "Mock Hypertension Guidance", similarity_score: 0.91 }
+            ],
+            session_id: session_id || `mock-session-hypertension-${Date.now()}`
+          }
+        };
+      }
+    }
+
+    // Default mock response
+    return {
+      data: {
+        answer: `This is a mocked health guidance response for patient ${patient_id}. You asked: "${question}". Make sure to follow exercise and salt-reduction guidelines.`,
+        sources: [
+          { document_title: "Hypertension Patient Guidance", similarity_score: 0.82 }
+        ],
+        session_id: session_id || `mock-session-${Date.now()}`
+      }
+    };
+  }
 
   throw { response: { data: { message: "Route not found in Mock API." } } };
 };
 
 // Override axios request layer if mock mode is on
 const mockInstance = {
-  post: async (url, data) => {
+  post: async (url, data, config) => {
     if (VITE_USE_MOCK) {
       apiEvents.emit("loading", true);
       try {
@@ -493,9 +603,9 @@ const mockInstance = {
         throw err;
       }
     }
-    return api.post(url, data);
+    return api.post(url, data, config);
   },
-  get: async (url, params) => {
+  get: async (url, config) => {
     if (VITE_USE_MOCK) {
       apiEvents.emit("loading", true);
       try {
@@ -512,7 +622,7 @@ const mockInstance = {
         throw err;
       }
     }
-    return api.get(url, { params });
+    return api.get(url, config);
   }
 };
 

@@ -23,7 +23,8 @@ from app.schemas.super_admin_schema import (
     SuperAdminLoginRequest, SuperAdminTokenResponse, DashboardSummaryResponse,
     HospitalCreate, HospitalUpdate, HospitalDetailResponse, HospitalListResponse,
     KnowledgeDocumentDetailResponse, KnowledgeDocumentListResponse, AssignAdminRequest,
-    UserMiniResponse, HospitalAdminResponse, DepartmentResponse, HospitalCreateResponse
+    UserMiniResponse, HospitalAdminResponse, DepartmentResponse, HospitalCreateResponse,
+    BulkUploadResponse
 )
 
 router = APIRouter()
@@ -804,6 +805,11 @@ def list_knowledge_base(
         # Retrieve count of generated chunks
         chunks_count = db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).count()
 
+        first_chunk = db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).first()
+        res_topic = None
+        if first_chunk and first_chunk.metadata_dict:
+            res_topic = first_chunk.metadata_dict.get("guidance_topic")
+
         response_items.append(KnowledgeDocumentDetailResponse(
             id=doc.id,
             hospital_id=doc.hospital_id,
@@ -816,7 +822,8 @@ def list_knowledge_base(
             version=doc.version,
             created_at=doc.created_at,
             updated_at=doc.updated_at,
-            chunk_count=chunks_count
+            chunk_count=chunks_count,
+            guidance_topic=res_topic
         ))
 
     return {
@@ -827,79 +834,107 @@ def list_knowledge_base(
         "total_pages": total_pages
     }
 
-@router.post("/knowledge-base/upload", response_model=KnowledgeDocumentDetailResponse, status_code=status.HTTP_201_CREATED)
+from fastapi import Response
+
+@router.post("/knowledge-base/upload", response_model=BulkUploadResponse, status_code=status.HTTP_200_OK)
 def upload_knowledge_document(
-    title: str = Form(...),
+    response: Response,
     category: str = Form(...),
     version: str = Form(...),
     hospital_id: Optional[str] = Form(None),
-    file: UploadFile = File(...),
+    guidance_topic: Optional[str] = Form(None),
+    files: List[UploadFile] = File(...),
     current_admin: User = Depends(get_current_super_admin),
     db: Session = Depends(get_db)
 ):
-    try:
-        doc = rag_service.ingest_document(
-            db=db,
-            hospital_id=hospital_id,
-            uploaded_by=current_admin.id,
-            title=title,
-            category=category,
-            version=version,
-            file=file
-        )
-    except HTTPException as he:
-        import traceback
-        traceback.print_exc()
-        # Pass HTTPExceptions from service
-        raise he
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to complete ingestion pipeline: {str(e)}"
-        )
+    successes = []
+    failures = []
 
-    # Auditing
-    log_audit(
-        db=db,
-        user_id=current_admin.id,
-        action="CREATE",
-        table_name="rag_documents",
-        record_id=doc.id,
-        new_values={
-            "title": doc.title,
-            "category": doc.category,
-            "version": doc.version,
-            "hospital_id": str(doc.hospital_id) if doc.hospital_id else None,
-            "file_url": doc.file_url
-        }
-    )
+    for f in files:
+        # Automatically generate title from filename
+        title = os.path.splitext(f.filename)[0]
+        # Clean title: replace underscores or dashes with spaces, clean whitespace
+        title = title.replace("_", " ").replace("-", " ").strip()
 
-    # Return details
-    h_name = None
-    if doc.hospital_id:
-        h = db.query(Hospital).filter(Hospital.id == doc.hospital_id).first()
-        if h:
-            h_name = h.name
-    
-    up_name = f"{current_admin.first_name} {current_admin.last_name}"
-    chunks_count = db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).count()
+        try:
+            doc = rag_service.ingest_document(
+                db=db,
+                hospital_id=hospital_id,
+                uploaded_by=current_admin.id,
+                title=title,
+                category=category,
+                version=version,
+                file=f,
+                guidance_topic=guidance_topic
+            )
 
-    return KnowledgeDocumentDetailResponse(
-        id=doc.id,
-        hospital_id=doc.hospital_id,
-        hospital_name=h_name,
-        uploaded_by=doc.uploaded_by,
-        uploader_name=up_name,
-        title=doc.title,
-        file_url=f"/api/v1/super-admin/knowledge-base/{doc.id}/download",
-        category=doc.category,
-        version=doc.version,
-        created_at=doc.created_at,
-        updated_at=doc.updated_at,
-        chunk_count=chunks_count
-    )
+            # Auditing
+            log_audit(
+                db=db,
+                user_id=current_admin.id,
+                action="CREATE",
+                table_name="rag_documents",
+                record_id=doc.id,
+                new_values={
+                    "title": doc.title,
+                    "category": doc.category,
+                    "version": doc.version,
+                    "hospital_id": str(doc.hospital_id) if doc.hospital_id else None,
+                    "file_url": doc.file_url
+                }
+            )
+
+            # Return details
+            h_name = None
+            if doc.hospital_id:
+                h = db.query(Hospital).filter(Hospital.id == doc.hospital_id).first()
+                if h:
+                    h_name = h.name
+
+            up_name = f"{current_admin.first_name} {current_admin.last_name}"
+            chunks_count = db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).count()
+
+            first_chunk = db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).first()
+            res_topic = None
+            if first_chunk and first_chunk.metadata_dict:
+                res_topic = first_chunk.metadata_dict.get("guidance_topic")
+
+            doc_detail = KnowledgeDocumentDetailResponse(
+                id=doc.id,
+                hospital_id=doc.hospital_id,
+                hospital_name=h_name,
+                uploaded_by=doc.uploaded_by,
+                uploader_name=up_name,
+                title=doc.title,
+                file_url=f"/api/v1/super-admin/knowledge-base/{doc.id}/download",
+                category=doc.category,
+                version=doc.version,
+                created_at=doc.created_at,
+                updated_at=doc.updated_at,
+                chunk_count=chunks_count,
+                guidance_topic=res_topic
+            )
+
+            successes.append({"filename": f.filename, "document": doc_detail})
+        except HTTPException as he:
+            import traceback
+            traceback.print_exc()
+            failures.append({"filename": f.filename, "error": he.detail})
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            failures.append({"filename": f.filename, "error": str(e)})
+
+    # Determine status code
+    if failures and successes:
+        response.status_code = status.HTTP_207_MULTI_STATUS
+    elif failures:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+
+    return {
+        "successes": successes,
+        "failures": failures
+    }
 
 @router.get("/knowledge-base/{document_id}", response_model=KnowledgeDocumentDetailResponse)
 def get_knowledge_document(
@@ -928,6 +963,11 @@ def get_knowledge_document(
 
     chunks_count = db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).count()
 
+    first_chunk = db.query(DocumentChunk).filter(DocumentChunk.document_id == doc.id).first()
+    res_topic = None
+    if first_chunk and first_chunk.metadata_dict:
+        res_topic = first_chunk.metadata_dict.get("guidance_topic")
+
     return KnowledgeDocumentDetailResponse(
         id=doc.id,
         hospital_id=doc.hospital_id,
@@ -940,7 +980,8 @@ def get_knowledge_document(
         version=doc.version,
         created_at=doc.created_at,
         updated_at=doc.updated_at,
-        chunk_count=chunks_count
+        chunk_count=chunks_count,
+        guidance_topic=res_topic
     )
 
 # Sub-route to retrieve preview list of chunks for a document

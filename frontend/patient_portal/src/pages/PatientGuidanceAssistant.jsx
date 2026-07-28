@@ -239,11 +239,13 @@ export const PatientGuidanceAssistant = () => {
     setGeneratingTtsIndex(index);
 
     try {
+      const isHindi = /[\u0900-\u097F]/.test(text);
+      const audioLang = isHindi ? "hi" : "kn";
       const response = await api.post(
         "/speech/synthesize",
         {
           text: text,
-          language: "kn",
+          language: audioLang,
           speaker: "Anu"
         },
         {
@@ -297,7 +299,8 @@ export const PatientGuidanceAssistant = () => {
     setSubmitting(true);
 
     const isKannada = /[\u0C80-\u0CFF]/.test(queryText);
-    const reqLang = isKannada ? "kn" : "en";
+    const isHindi = /[\u0900-\u097F]/.test(queryText);
+    const reqLang = isKannada ? "kn" : isHindi ? "hi" : "en";
 
     // 2. Query RAG backend ask API
     try {
@@ -515,7 +518,7 @@ export const PatientGuidanceAssistant = () => {
               messages.map((msg, index) => {
                 const isPatient = msg.sender === "PATIENT";
                 const isError = msg.sender === "ERROR";
-                const hasKannada = /[\u0C80-\u0CFF]/.test(msg.text);
+                const hasKannadaOrHindi = /[\u0C80-\u0CFF]/.test(msg.text) || /[\u0900-\u097F]/.test(msg.text);
                 
                 return (
                   <div
@@ -567,7 +570,7 @@ export const PatientGuidanceAssistant = () => {
                           </div>
 
                           {/* TTS Speaker Play/Stop Button on the right */}
-                          {hasKannada && (
+                          {hasKannadaOrHindi && (
                             <button
                               type="button"
                               onClick={() => handleTtsPlayClick(msg.text, index)}

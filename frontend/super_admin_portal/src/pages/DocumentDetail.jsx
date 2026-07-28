@@ -122,6 +122,11 @@ export default function DocumentDetail() {
                   <p className="text-sm text-foreground leading-relaxed text-white/90 bg-secondary/15 p-3 rounded-lg border border-border/40">
                     {chk.content}
                   </p>
+                  {chk.metadata && (
+                    <div className="text-[10px] text-muted-foreground bg-secondary/20 p-2 rounded border border-border/30 font-mono">
+                      <strong>Metadata:</strong> {JSON.stringify(chk.metadata)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -157,6 +162,16 @@ export default function DocumentDetail() {
                   <p className="text-xs text-white font-medium">{doc.hospital_name || "Platform Global Scope"}</p>
                 </div>
               </div>
+
+              {doc.guidance_topic && (
+                <div className="flex items-center gap-3">
+                  <Layers className="w-4.5 h-4.5 text-muted-foreground shrink-0" />
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase block">Guidance Topic</span>
+                    <p className="text-xs text-white font-medium">{doc.guidance_topic}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 border-t border-border flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Embedding Dimensions:</span>

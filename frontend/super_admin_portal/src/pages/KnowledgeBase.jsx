@@ -12,6 +12,14 @@ const CATEGORIES = [
   { value: "OTHER", label: "Other" }
 ];
 
+const GUIDANCE_TOPICS = [
+  { value: "PREGNANCY", label: "Pregnancy" },
+  { value: "DIABETES", label: "Diabetes" },
+  { value: "HYPERTENSION", label: "Hypertension" },
+  { value: "NUTRITION", label: "Nutrition" },
+  { value: "CHILD_HEALTH", label: "Child Health" }
+];
+
 export default function KnowledgeBase() {
   const [documents, setDocuments] = useState([]);
   const [hospitals, setHospitals] = useState([]);
@@ -30,12 +38,12 @@ export default function KnowledgeBase() {
   // Upload modal state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploadForm, setUploadForm] = useState({
-    title: "",
     category: "CLINICAL_STANDARDS",
+    guidance_topic: "",
     version: "1.0",
     scope: "global", // "global" | "hospital"
     hospital_id: "",
-    file: null
+    files: []
   });
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -94,8 +102,8 @@ export default function KnowledgeBase() {
   // Upload form submission
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
-    if (!uploadForm.file) {
-      setUploadError("Please select a document file to upload.");
+    if (uploadForm.files.length === 0) {
+      setUploadError("Please select at least one document file to upload.");
       return;
     }
 
@@ -103,33 +111,68 @@ export default function KnowledgeBase() {
     setUploadError("");
 
     const formData = new FormData();
-    formData.append("title", uploadForm.title);
     formData.append("category", uploadForm.category);
     formData.append("version", uploadForm.version);
-    formData.append("file", uploadForm.file);
+    
+    uploadForm.files.forEach((f) => {
+      formData.append("files", f);
+    });
     
     if (uploadForm.scope === "hospital" && uploadForm.hospital_id) {
       formData.append("hospital_id", uploadForm.hospital_id);
     }
 
+    if (uploadForm.category === "PATIENT_GUIDANCE" && uploadForm.guidance_topic) {
+      formData.append("guidance_topic", uploadForm.guidance_topic);
+    }
+
     try {
-      await api.post("/knowledge-base/upload", formData, {
+      const response = await api.post("/knowledge-base/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 180000
+        timeout: 300000
       });
-      setIsUploadOpen(false);
-      setUploadForm({
-        title: "",
-        category: "CLINICAL_STANDARDS",
-        version: "1.0",
-        scope: "global",
-        hospital_id: "",
-        file: null
-      });
-      apiEvents.emit("toast", { type: "success", message: "Document uploaded and ingested successfully." });
-      fetchDocuments();
+
+      const { successes, failures } = response.data;
+
+      if (failures && failures.length > 0) {
+        const failMsg = failures.map(f => `${f.filename}: ${f.error}`).join("\n");
+        setUploadError(`Some uploads failed:\n${failMsg}`);
+        
+        if (successes && successes.length > 0) {
+          apiEvents.emit("toast", { 
+            type: "warning", 
+            message: `${successes.length} documents ingested, ${failures.length} failed.` 
+          });
+          fetchDocuments();
+          const successfulNames = successes.map(s => s.filename);
+          setUploadForm(prev => ({
+            ...prev,
+            files: prev.files.filter(f => !successfulNames.includes(f.name))
+          }));
+        }
+      } else {
+        setIsUploadOpen(false);
+        setUploadForm({
+          category: "CLINICAL_STANDARDS",
+          guidance_topic: "",
+          version: "1.0",
+          scope: "global",
+          hospital_id: "",
+          files: []
+        });
+        apiEvents.emit("toast", { type: "success", message: "All documents uploaded and ingested successfully." });
+        fetchDocuments();
+      }
     } catch (err) {
-      setUploadError(err.response?.data?.detail || "Ingestion pipeline failure. Check server logs.");
+      const detail = err.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        const msg = detail.map(item => `${item.loc.join('.')}: ${item.msg}`).join('\n');
+        setUploadError(msg);
+      } else if (typeof detail === "object" && detail !== null) {
+        setUploadError(JSON.stringify(detail));
+      } else {
+        setUploadError(detail || "Ingestion pipeline failure. Check server logs.");
+      }
     } finally {
       setUploadLoading(false);
     }
@@ -366,15 +409,23 @@ export default function KnowledgeBase() {
             <form onSubmit={handleUploadSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-muted-foreground uppercase">Document Title</label>
-                  <input
-                    type="text"
-                    required
-                    value={uploadForm.title}
-                    onChange={(e) => setUploadForm(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="e.g. Hypertension Guidelines"
+                  <label className="text-xs font-bold text-muted-foreground uppercase">Category</label>
+                  <select
+                    value={uploadForm.category}
+                    onChange={(e) => {
+                      const newCategory = e.target.value;
+                      setUploadForm(prev => ({
+                        ...prev,
+                        category: newCategory,
+                        guidance_topic: newCategory === "PATIENT_GUIDANCE" ? prev.guidance_topic : ""
+                      }));
+                    }}
                     className="w-full px-3.5 py-2.5 bg-input border border-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
-                  />
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-muted-foreground uppercase">Version</label>
@@ -391,18 +442,6 @@ export default function KnowledgeBase() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-muted-foreground uppercase">Category</label>
-                  <select
-                    value={uploadForm.category}
-                    onChange={(e) => setUploadForm(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 bg-input border border-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
                   <label className="text-xs font-bold text-muted-foreground uppercase">Scope</label>
                   <select
                     value={uploadForm.scope}
@@ -413,6 +452,23 @@ export default function KnowledgeBase() {
                     <option value="hospital">Hospital Specific</option>
                   </select>
                 </div>
+                {uploadForm.category === "PATIENT_GUIDANCE" ? (
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-muted-foreground uppercase">Guidance Topic</label>
+                    <select
+                      value={uploadForm.guidance_topic}
+                      onChange={(e) => setUploadForm(prev => ({ ...prev, guidance_topic: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 bg-input border border-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
+                    >
+                      <option value="">-- Choose Guidance Topic --</option>
+                      {GUIDANCE_TOPICS.map((topic) => (
+                        <option key={topic.value} value={topic.value}>{topic.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div />
+                )}
               </div>
 
               {uploadForm.scope === "hospital" && (
@@ -433,16 +489,43 @@ export default function KnowledgeBase() {
               )}
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground uppercase">Select File (PDF or TXT)</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase">Select Files (PDF or TXT)</label>
                 <input
                   type="file"
-                  required
+                  required={uploadForm.files.length === 0}
+                  multiple
                   accept=".pdf,.txt"
-                  onChange={(e) => setUploadForm(prev => ({ ...prev, file: e.target.files[0] }))}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.files);
+                    setUploadForm(prev => ({ ...prev, files: [...prev.files, ...selected] }));
+                  }}
                   className="w-full px-3 py-2 bg-input border border-border rounded-lg text-xs text-white focus:outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary/20 file:text-primary hover:file:bg-primary/30 file:cursor-pointer"
                 />
-                <span className="text-[10px] text-muted-foreground mt-0.5 block">Maximum size limit: 10MB</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5 block">Maximum size limit per file: 10MB</span>
               </div>
+
+              {uploadForm.files.length > 0 && (
+                <div className="mt-3 space-y-2 max-h-36 overflow-y-auto bg-secondary/10 p-3 rounded-lg border border-border">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase block">Selected Files ({uploadForm.files.length}):</span>
+                  {uploadForm.files.map((f, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs text-white bg-card p-2 rounded border border-border/50">
+                      <span className="truncate max-w-[80%] font-semibold">{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadForm(prev => ({
+                            ...prev,
+                            files: prev.files.filter((_, i) => i !== idx)
+                          }));
+                        }}
+                        className="text-destructive hover:text-destructive/80 text-xs font-semibold px-1"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="pt-2 flex justify-end gap-3">
                 <button
